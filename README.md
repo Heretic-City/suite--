@@ -38,9 +38,7 @@
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
-    <li>
-      <a href="#smart-contracts--addresses">Smart Contracts & Addresses</a>
-    </li>
+    <li><a href="#smart-contracts--addresses">Smart Contracts & Addresses</a></li>
     <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
@@ -61,7 +59,7 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://heretic.city)
 
-Heretic City is a decentralized organization focused on seamless asset migration between the XRP Ledger and Starknet. By utilizing a secure relayer-based bridge, users can wrap XRP into **sXRP** on Starknet at a 1:1 ratio.
+Heretic City is a decentralized organization focused on bridging the XRP Ledger and Starknet. By utilizing a secure relayer-based bridge, users can wrap XRP into **sXRP** on Starknet at a 1:1 ratio, enabling high-speed ZK-DeFi for XRPL assets.
 
 **Key Components:**
 * **XRPL Vault:** Secure custody of native XRP assets.
@@ -96,6 +94,6 @@ Heretic City is a decentralized organization focused on seamless asset migration
 
 ### Prerequisites
 
-* **Scarb & Cairo:**
+* **Scarb & Cairo:** The build toolchain for Starknet.
   ```sh
   curl --proto '=https' --tlsv1.2 -sSf [https://docs.swmansion.com/scarb/install.sh](https://docs.swmansion.com/scarb/install.sh) | sh

@@ -1,0 +1,10 @@
+# Starknet / Scarb
+target/
+
+# Node / JS
+node_modules/
+npm-debug.log
+.env
+
+# MacOS
+.DS_Store

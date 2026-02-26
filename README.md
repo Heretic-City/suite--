@@ -10,7 +10,7 @@
 <br />
 <div align="center">
   <a href="https://heretic.city">
-    <img src="https://www.heretic.city/logo.png" alt="Logo" width="80" height="80">
+    <img src="https://www.heretic.city/logo.png" alt="HC_suite--" width="80" height="80">
   </a>
 
   <h3 align="center">Heretic City</h3>

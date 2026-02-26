@@ -1,0 +1,4 @@
+[sncast.mainnet]
+url = "YOUR-RPC-URL"
+account = "YOUR-ACCOUNT-NAME"
+accounts-file = "~/path/to/your/accountsfile.json"

@@ -1,0 +1,12 @@
+[package]
+name = "heretic_oracle_guard"
+version = "0.1.0"
+edition = "2024_07"
+
+[dependencies]
+starknet = "2.15.0"
+snforge_std = "0.56.0"
+
+[[target.starknet-contract]]
+sierra = true
+casm = true

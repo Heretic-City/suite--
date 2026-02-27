@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HXT — Genesis Sale & Black Paper</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/starknetkit@2.3.2/dist/index.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0A0A0F;
+            --text-light: #E0E0E0;
+            --accent-green: #00FFC0;
+            --accent-blue: #00A2FF;
+            --glass-border: rgba(0, 255, 192, 0.3);
+            --glass-bg: rgba(10, 10, 15, 0.6);
+            --font-orbitron: 'Orbitron', sans-serif;
+            --font-montserrat: 'Montserrat', sans-serif;
+        }
+
+        /* PURPLE PRO THEME */
+        body.pro-mode {
+            --accent-green: #bc13fe; /* Cyberpunk Purple */
+            --accent-blue: #ff00ff;
+            --glass-border: rgba(188, 19, 254, 0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-montserrat);
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            transition: background 0.5s ease;
+            overflow-x: hidden;
+        }
+
+        .glass-effect {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            transition: border 0.5s ease;
+        }
+
+        .navbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1.5rem 5%; background: rgba(10,10,15,0.9);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .buy-terminal-section { display: flex; justify-content: center; padding: 4rem 5%; }
+        .terminal-container { max-width: 650px; width: 100%; padding: 2.5rem; }
+        
+        .terminal-tabs { display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 2rem; }
+        .tab-btn {
+            flex: 1; padding: 1rem; background: transparent; border: none;
+            color: var(--text-light); font-family: var(--font-orbitron); cursor: pointer; opacity: 0.5;
+        }
+        .tab-btn.active { opacity: 1; color: var(--accent-green); border-bottom: 2px solid var(--accent-green); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .input-group { margin: 1.5rem 0; display: flex; justify-content: center; gap: 10px; }
+        .input-group input, select { 
+            padding: 0.8rem; border-radius: 5px; border: 1px solid var(--glass-border); 
+            background: rgba(0,0,0,0.3); color: white; width: 100%;
+        }
+
+        /* SLIDER STYLING */
+        .split-slider-container { margin: 2rem 0; text-align: left; }
+        .split-slider-container label { font-size: 0.8rem; font-family: var(--font-orbitron); color: var(--accent-green); }
+        
+        input[type=range] { width: 100%; margin: 10px 0; cursor: pointer; }
+
+        .purchase-btn {
+            width: 100%; padding: 1.2rem; background: var(--accent-green);
+            color: black; font-family: var(--font-orbitron); font-weight: bold; border: none; cursor: pointer;
+            border-radius: 8px; box-shadow: 0 0 15px var(--accent-green);
+        }
+
+        /* PEEL STYLE */
+        .black-paper-shell { padding: 6rem 5%; display: flex; justify-content: center; position: relative; }
+        .black-paper-container { position: relative; max-width: 900px; width: 100%; }
+        
+        .corner-peel {
+            position: absolute; top: -1px; right: -1px; width: 80px; height: 80px;
+            background: linear-gradient(225deg, transparent 50%, var(--accent-green) 50%);
+            z-index: 100; cursor: pointer; border-radius: 0 20px 0 20px; transition: all 0.5s ease;
+        }
+        .peel-text {
+            position: absolute; top: 22px; right: 10px; font-size: 14px; font-weight: 800;
+            color: #000; transform: rotate(45deg); font-family: var(--font-orbitron);
+        }
+
+        .black-paper { padding: 60px; border: 1px solid var(--glass-border); border-radius: 20px; text-align: left; }
+        
+        .countdown-clock {
+            font-family: var(--font-orbitron); font-size: 2.5rem; color: var(--accent-green);
+            border: 2px solid var(--accent-green); padding: 1rem 2rem; display: inline-block;
+            margin-top: 2rem; border-radius: 15px;
+        }
+
+        .dice-box {
+            margin: 1.5rem 0; padding: 1rem; background: rgba(0, 162, 255, 0.05);
+            border: 1px dashed var(--accent-blue); color: var(--accent-blue); font-family: monospace;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="logo" style="color:var(--accent-green); font-family:var(--font-orbitron); font-weight:700; font-size:1.5rem;">HXT</div>
+        <button class="purchase-btn" style="width:auto; padding:0.6rem 1.5rem; box-shadow:none;">Connect Wallet</button>
+<button id="connectBinance" class="purchase-btn" 
+        style="background: #F3BA2F; color: black; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px;">
+    <img src="https://bin.bnbstatic.com/static/images/common/favicon.ico" width="20">
+    CONNECT BINANCE WALLET
+</button>
+<button id="connectReady" class="purchase-btn" 
+        onclick="connectReadyWallet()"
+        style="background: #ff4f40; color: white; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 12px;">
+    <svg width="20" height="20" viewBox="0 0 100 100" fill="currentColor">
+        <circle cx="50" cy="50" r="45" stroke="white" stroke-width="5" fill="none"/>
+        <path d="M30 70 L50 30 L70 70" stroke="white" stroke-width="8" fill="none"/>
+    </svg>
+    CONNECT READY WALLET
+</button>
+    </header>
+
+    <main>
+        <section style="text-align:center; padding: 4rem 5%;">
+            <h1 style="font-family:var(--font-orbitron); color:var(--accent-green); font-size:3rem;">HERETIC PROTOCOL</h1>
+            <p style="opacity:0.7;">Connecting XRP Liquidity to Starknet Execution.</p>
+            <div class="countdown-clock" id="clock">00:00:00:00</div>
+        </section>
+
+        <section class="buy-terminal-section">
+            <div class="terminal-container glass-effect">
+                <div class="terminal-tabs">
+                    <button class="tab-btn active" id="tab-genesis" onclick="switchTab('genesis')">GENESIS SALE</button>
+                    <button class="tab-btn" id="tab-bridge" onclick="switchTab('bridge')">HERETIC BRIDGE</button>
+                </div>
+
+                <div id="genesis-content" class="tab-content active">
+                    <h3>DIRECT PURCHASE</h3>
+                    <div class="input-group">
+                        <input type="number" placeholder="0.00">
+                        <select style="width:100px;"><option>USDC</option></select>
+                    </div>
+                    <button class="purchase-btn">PURCHASE HXT</button>
+                </div>
+
+                <div id="bridge-content" class="tab-content">
+                    <h3>XRP → STARKNET</h3>
+                    <div class="input-group">
+                        <input type="number" id="xrp-amount" placeholder="Amount of XRP">
+                        <select id="risk-select" style="width:180px;" onchange="updateMemo()">
+                            <option value="0">RISK: NONE (0)</option>
+                            <option value="2">RISK: LOW (1-3)</option>
+                            <option value="5">RISK: MID (4-6)</option>
+                            <option value="9">RISK: HERETIC (7-9)</option>
+                        </select>
+                    </div>
+
+                    <div class="split-slider-container">
+                        <label>ALLOCATION: <span id="split-val">100</span>% sXRP / <span id="hxt-val">0</span>% HXT</label>
+                        <input type="range" id="split-slider" min="0" max="9" value="0" oninput="updateMemo()">
+                    </div>
+
+                    <div id="dice-result" class="dice-box">Awaiting Oracle Query...</div>
+                    <button class="purchase-btn" onclick="initiateBridge()">INITIATE FATE</button>
+                    <p style="font-size:0.7rem; margin-top:1.5rem; opacity:0.6; letter-spacing:2px;">
+                        MEMO: <span id="memo-output" style="color:var(--accent-green)">0000000000</span>
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="black-paper-shell">
+            <div class="black-paper-container">
+                <div class="corner-peel" id="pro-toggle">
+                    <span class="peel-text" id="peel-label">PRO</span>
+                </div>
+                <div class="black-paper glass-effect">
+                    <h2 style="font-family:var(--font-orbitron); color:var(--accent-green); margin-bottom:1rem;">THE BLACK PAPER</h2>
+                    <p>The Heretic Protocol is the high-frequency conduit for the $50B XRP market.</p>
+                    <br>
+                    <a href="blackpaper.html" style="color:var(--accent-green); text-decoration:none; font-weight:bold;">[ VIEW FULL SPECIFICATIONS ]</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let contractTxId = 1; // Starts at 1, increments on bridge
+
+        function updateMemo() {
+            // 1. Get Values
+            const split = document.getElementById('split-slider').value;
+            const risk = document.getElementById('risk-select').value;
+            
+            // 2. FIX: Update the UI percentage labels
+            const sXRPPercent = (10 - split) * 10;
+            const hxtPercent = split * 10;
+            document.getElementById('split-val').innerText = sXRPPercent;
+            document.getElementById('hxt-val').innerText = hxtPercent;
+
+            // 3. Build 10-Digit Memo
+            const txPadded = String(contractTxId).padStart(3, '0');
+            // Format: [Split][TxID (3)][Gift (0)][Risk][Reserved (0000)]
+            const memo = `${split}${txPadded}0${risk}0000`;
+            document.getElementById('memo-output').innerText = memo;
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`${tab}-content`).classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+        }
+
+        // PRO MODE TOGGLE
+        document.getElementById('pro-toggle').addEventListener('click', () => {
+            document.body.classList.toggle('pro-mode');
+            const isPro = document.body.classList.contains('pro-mode');
+            document.getElementById('peel-label').innerText = isPro ? "USER" : "PRO";
+            updateMemo();
+        });
+
+        async function initiateBridge() {
+            const dice = document.getElementById('dice-result');
+            dice.innerText = "CONSULTING STARKNET ORACLE...";
+            dice.style.color = "var(--accent-green)";
+            
+            await new Promise(r => setTimeout(r, 1500));
+            
+            const paths = ['WBTC', 'USDC', 'ETH'];
+            const chosen = paths[Math.floor(Math.random() * paths.length)];
+            dice.innerText = `FATE CHOSEN: LIQUIDITY VIA ${chosen} PATH`;
+            
+            contractTxId++; // Increment Tx Counter
+            updateMemo();
+        }
+
+        // CLOCK LOGIC
+        function runClock() {
+            const target = new Date().getTime() + 604800000; // 7 days
+            setInterval(() => {
+                const now = new Date().getTime();
+                const d = target - now;
+                const h = Math.floor((d % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((d % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((d % (1000 * 60)) / 1000);
+                document.getElementById('clock').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            }, 1000);
+        }
+	async function connectBinanceWallet() {
+  // 1. Detect Binance Chain Extension specifically, then fallback to Ethereum provider
+  const provider = window.BinanceChain || window.ethereum;
+
+  if (provider) {
+    try {
+      // Request accounts
+      const accounts = await provider.request({ method: 'eth_requestAccounts' });
+      const account = accounts[0];
+      
+      // Update UI
+      console.log('Connected to Binance Wallet:', account);
+      const btn = document.querySelector('.connect-wallet');
+      btn.innerText = account.substring(0, 6) + "..." + account.substring(38);
+      btn.style.background = "#F3BA2F"; // Binance Gold
+      btn.style.color = "#000";
+
+      // Auto-select XRP in the bridge if that's the intent
+      if(document.getElementById('bridge-content').classList.contains('active')) {
+          document.getElementById('xrp-amount').focus();
+      }
+      
+    } catch (error) {
+      console.error('Connection refused', error);
+    }
+  } else {
+    alert('Binance Wallet not detected. Please install the extension or use the Binance App.');
+  }
+}
+async function connectReadyWallet() {
+    try {
+        // 1. Trigger the connection modal via the global StarknetKit object
+        const result = await StarknetKit.connect({
+            modalMode: 'alwaysAsk',
+            modalTheme: 'dark',
+            webWalletUrl: 'https://web.argent.xyz',
+            // This ensures Ready/Argent shows up first
+            connectors: [], 
+        });
+
+        // 2. Check connection
+        if (result && result.wallet && result.wallet.isConnected) {
+            const userAddress = result.wallet.selectedAddress;
+            
+            // 3. Update the UI
+            const btn = document.getElementById('connectReady');
+            if (btn) {
+                btn.innerText = userAddress.substring(0, 6) + "..." + userAddress.substring(userAddress.length - 4);
+                btn.style.background = "#ff4f40"; 
+            }
+
+            // 4. Update the Protocol Memo
+            contractTxId++; // Increment the bridge state
+            updateMemo();
+            
+            console.log("Connected to Ready Wallet:", userAddress);
+        }
+    } catch (error) {
+        console.error("Connection failed:", error);
+    }
+}
+        // Initialize
+        runClock();
+        updateMemo();
+    </script>
+</body>
+</html>

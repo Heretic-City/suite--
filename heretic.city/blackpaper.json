@@ -1,0 +1,64 @@
+{
+  "sections": [
+    {
+      "title": "1. The Architecture of the sXRP Bridge and XRPL Integration",
+      "intro": "The foundational component of the suite is the sXRP Bridge...",
+      "modules": [
+        {
+          "type": "module",
+          "title": "Transaction Verification and Metadata Analysis",
+          "content": [
+            "Mitigating Partial Payment Exploits: Uses meta.delivered_amount.",
+            "Validation Filters: Requires tesSUCCESS in validated ledger.",
+            "Real-Time Parity: WebSocket ledger monitoring."
+          ]
+        },
+        {
+          "type": "module",
+          "title": "Address Resolution and Routing Mechanisms",
+          "content": [
+            "Direct Memo → Memos.MemoData",
+            "Destination Tag → Registry Mapping",
+            "Fallback Recipient → .env administrative address"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "2. Engineering the Sequential Relayer and Nonce Management",
+      "intro": "The relayer translates XRPL state transitions into Starknet mint operations.",
+      "modules": [
+        {
+          "type": "module",
+          "title": "Sequential Processing and Mempool Integrity",
+          "content": [
+            "Strict sequential nonces enforced.",
+            "Global isProcessing lock.",
+            "Queue ensures ACCEPTED_ON_L2 confirmation."
+          ]
+        },
+        {
+          "type": "advanced",
+          "title": "Idempotency and Deduplication Logic",
+          "content": [
+            "processedHashes set prevents duplicate minting.",
+            "Check-and-Set pattern avoids race conditions."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "3. HereticToken (HXT) and the Economic Engine",
+      "intro": "HXT serves as the economic engine solving liquidity desert effects.",
+      "tokenomics": {
+        "total_supply": "100,000,000 HXT",
+        "distribution": [
+          { "label": "Initial Liquidity Sale", "percent": 40 },
+          { "label": "Ecosystem Incentives", "percent": 25 },
+          { "label": "Protocol Treasury", "percent": 20 },
+          { "label": "Founder & Development", "percent": 15 }
+        ]
+      }
+    }
+  ]
+}

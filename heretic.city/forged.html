@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>HXT — The Black Paper</title>
+
+<style>
+/* ===== GLOBAL RESET ===== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== BACKGROUND ===== */
+body {
+  background:
+    radial-gradient(circle at top, #2a2a2a 0%, #0b0b0b 55%, #000 100%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(255,255,255,0.02) 0px,
+      rgba(255,255,255,0.02) 1px,
+      transparent 2px,
+      transparent 6px
+    );
+  font-family: "Georgia", "Times New Roman", serif;
+  color: #f4f1ea; /* FIXED: Changed from #111 so default text is visible */
+  min-height: 100vh;
+  padding: 60px 20px;
+}
+
+/* ===== CONTAINER ===== */
+.black-paper {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 60px 70px;
+  background: linear-gradient(145deg, #111, #0a0a0a);
+  border-radius: 12px;
+  box-shadow:
+    0 0 60px rgba(0,255,192,0.05),
+    0 0 120px rgba(0,0,0,0.9);
+  border: 1px solid rgba(0,255,192,0.08);
+}
+details summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 10px 0;
+}
+.section {
+  margin-bottom: 100px;
+  position: relative;
+}
+.module {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(0,255,192,0.1);
+  padding: 24px;
+  border-radius: 8px;
+  margin: 30px 0;
+  transition: 0.3s ease;
+}
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.token-card {
+  background: rgba(0,255,192,0.03);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,255,192,0.15);
+  text-align: center;
+}
+.module:hover {
+  border-color: rgba(0,255,192,0.3);
+  box-shadow: 0 0 30px rgba(0,255,192,0.08);
+}
+.section::after {
+  content: "";
+  display: block;
+  margin-top: 60px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(0,255,192,0.4),
+    transparent
+  );
+}
+/* ===== TEXT STATE ===== */
+.line {
+  opacity: 0;
+  filter: blur(6px);
+  color: #1a1a1a;
+  text-shadow: none;
+  transition:
+    opacity 1.8s ease,
+    filter 1.8s ease,
+    color 1.8s ease,
+    text-shadow 1.8s ease;
+}
+
+/* ===== HEATED STATE ===== */
+.line.reveal {
+  opacity: 1;
+  filter: blur(0);
+  color: #f4f1ea;
+  text-shadow:
+    0 0 6px rgba(255,140,60,0.5),
+    0 0 14px rgba(255,80,20,0.4),
+    0 0 28px rgba(255,30,10,0.25);
+}
+
+/* ===== TITLES ===== */
+h1, h2 {
+  margin: 40px 0 20px;
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+h1 {
+  font-size: 2.4rem;
+  text-align: center;
+}
+
+h2 {
+  font-size: 1.6rem;
+  color: #ff8c3c; /* Added a subtle orange to headers to match the forge theme */
+}
+
+/* ===== SUBTLE FLICKER ===== */
+@keyframes ember {
+  0% { text-shadow: 0 0 10px rgba(255,100,40,0.4); }
+  50% { text-shadow: 0 0 18px rgba(255,60,20,0.6); }
+  100% { text-shadow: 0 0 10px rgba(255,100,40,0.4); }
+}
+
+.line.reveal {
+  animation: ember 4s infinite ease-in-out;
+}
+
+/* Make code blocks readable against the dark background */
+pre, code {
+    color: #00FFC0;
+}
+</style>
+</head>
+
+<body>
+<div class="black-paper">
+  <div id="dynamic-sections"></div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  fetch('blackpaper.json')
+    .then(res => res.json())
+    .then(data => renderSections(data.sections));
+
+  function renderSections(sections) {
+    const container = document.getElementById("dynamic-sections");
+
+    sections.forEach(section => {
+
+      const sectionDiv = document.createElement("div");
+      sectionDiv.className = "section line";
+
+      const h2 = document.createElement("h2");
+      h2.textContent = section.title;
+      sectionDiv.appendChild(h2);
+
+      if (section.intro) {
+        const p = document.createElement("p");
+        p.textContent = section.intro;
+        sectionDiv.appendChild(p);
+      }
+
+      // Modules
+      if (section.modules) {
+        section.modules.forEach(module => {
+
+          if (module.type === "module") {
+            const mod = document.createElement("div");
+            mod.className = "module";
+
+            const h3 = document.createElement("h3");
+            h3.textContent = module.title;
+            mod.appendChild(h3);
+
+            const ul = document.createElement("ul");
+            module.content.forEach(item => {
+              const li = document.createElement("li");
+              li.textContent = item;
+              ul.appendChild(li);
+            });
+
+            mod.appendChild(ul);
+            sectionDiv.appendChild(mod);
+          }
+
+          if (module.type === "advanced") {
+            const details = document.createElement("details");
+            details.className = "module";
+
+            const summary = document.createElement("summary");
+            summary.textContent = module.title;
+            details.appendChild(summary);
+
+            module.content.forEach(item => {
+              const p = document.createElement("p");
+              p.textContent = item;
+              details.appendChild(p);
+            });
+
+            sectionDiv.appendChild(details);
+          }
+
+        });
+      }
+
+      // Tokenomics special renderer
+      if (section.tokenomics) {
+        const supply = document.createElement("p");
+        supply.innerHTML = "<strong>Total Supply:</strong> " + section.tokenomics.total_supply;
+        sectionDiv.appendChild(supply);
+
+        const grid = document.createElement("div");
+        grid.className = "token-grid";
+
+        section.tokenomics.distribution.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "token-card";
+          card.innerHTML = "<h4>" + item.percent + "%</h4><p>" + item.label + "</p>";
+          grid.appendChild(card);
+        });
+
+        sectionDiv.appendChild(grid);
+      }
+
+      container.appendChild(sectionDiv);
+    });
+
+    igniteForge();
+  }
+
+  function igniteForge() {
+    const lines = document.querySelectorAll(".line");
+    let delay = 0;
+
+    lines.forEach((line) => {
+      setTimeout(() => {
+        line.classList.add("reveal");
+      }, delay);
+      delay += 700;
+    });
+  }
+
+});
+</script>
+</body>
+</html>

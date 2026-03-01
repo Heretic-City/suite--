@@ -5,149 +5,129 @@
 <title>HXT — The Black Paper</title>
 
 <style>
-/* ===== GLOBAL RESET ===== */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ===== BACKGROUND ===== */
 body {
-  background:
-    radial-gradient(circle at top, #2a2a2a 0%, #0b0b0b 55%, #000 100%),
-    repeating-linear-gradient(
-      45deg,
-      rgba(255,255,255,0.02) 0px,
-      rgba(255,255,255,0.02) 1px,
-      transparent 2px,
-      transparent 6px
-    );
-  font-family: "Georgia", "Times New Roman", serif;
-  color: #f4f1ea; /* FIXED: Changed from #111 so default text is visible */
+  background: radial-gradient(circle at top, #2a2a2a 0%, #0b0b0b 55%, #000 100%);
+  font-family: Georgia, serif;
+  color: #f4f1ea;
   min-height: 100vh;
   padding: 60px 20px;
 }
 
-/* ===== CONTAINER ===== */
+/* ===== BLACK PAPER + SCANLINE ===== */
 .black-paper {
+  position: relative;
   max-width: 1000px;
   margin: 0 auto;
-  padding: 60px 70px;
+  padding: 70px;
   background: linear-gradient(145deg, #111, #0a0a0a);
-  border-radius: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,255,192,0.08);
   box-shadow:
     0 0 60px rgba(0,255,192,0.05),
     0 0 120px rgba(0,0,0,0.9);
-  border: 1px solid rgba(0,255,192,0.08);
+  overflow: hidden;
 }
-details summary {
-  cursor: pointer;
-  font-weight: bold;
-  padding: 10px 0;
+
+.black-paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,255,192,0.03) 0px,
+    rgba(0,255,192,0.03) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  animation: scanMove 8s linear infinite;
+  pointer-events: none;
 }
-.section {
-  margin-bottom: 100px;
-  position: relative;
+
+@keyframes scanMove {
+  from { transform: translateY(0); }
+  to   { transform: translateY(40px); }
 }
+
+.section { margin-bottom: 100px; position: relative; z-index: 2; }
+
 .module {
   background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(0,255,192,0.1);
+  border: 1px solid rgba(0,255,192,0.12);
   padding: 24px;
-  border-radius: 8px;
+  border-radius: 10px;
   margin: 30px 0;
   transition: 0.3s ease;
 }
+
+.module:hover {
+  border-color: rgba(0,255,192,0.35);
+  box-shadow: 0 0 30px rgba(0,255,192,0.08);
+}
+
 .token-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 20px;
   margin-top: 30px;
 }
 
 .token-card {
-  background: rgba(0,255,192,0.03);
+  background: rgba(0,255,192,0.05);
   padding: 20px;
   border-radius: 8px;
+  border: 1px solid rgba(0,255,192,0.2);
+}
+
+h2 { margin-bottom: 20px; font-size: 1.6rem; color: #ff8c3c; }
+h3 { margin-bottom: 12px; color: #00FFC0; }
+p  { margin-bottom: 15px; line-height: 1.7; }
+
+/* ===== CODE ===== */
+pre {
+  background: #0d1117;
+  padding: 20px;
+  border-radius: 8px;
+  overflow-x: auto;
   border: 1px solid rgba(0,255,192,0.15);
-  text-align: center;
 }
-.module:hover {
-  border-color: rgba(0,255,192,0.3);
-  box-shadow: 0 0 30px rgba(0,255,192,0.08);
+
+code {
+  color: #00FFC0;
+  font-family: "Courier New", monospace;
+  font-size: 0.95rem;
 }
-.section::after {
-  content: "";
-  display: block;
-  margin-top: 60px;
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(0,255,192,0.4),
-    transparent
-  );
+
+.inline-code {
+  background: rgba(0,255,192,0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "Courier New", monospace;
+  color: #00FFC0;
 }
-/* ===== TEXT STATE ===== */
+
+/* ===== SCROLL FORGE ===== */
 .line {
   opacity: 0;
-  filter: blur(6px);
-  color: #1a1a1a;
-  text-shadow: none;
-  transition:
-    opacity 1.8s ease,
-    filter 1.8s ease,
-    color 1.8s ease,
-    text-shadow 1.8s ease;
+  transform: translateY(40px);
+  filter: blur(8px);
+  transition: 1.2s ease;
 }
 
-/* ===== HEATED STATE ===== */
 .line.reveal {
   opacity: 1;
+  transform: translateY(0);
   filter: blur(0);
-  color: #f4f1ea;
   text-shadow:
-    0 0 6px rgba(255,140,60,0.5),
-    0 0 14px rgba(255,80,20,0.4),
-    0 0 28px rgba(255,30,10,0.25);
-}
-
-/* ===== TITLES ===== */
-h1, h2 {
-  margin: 40px 0 20px;
-  font-weight: normal;
-  letter-spacing: 1px;
-}
-
-h1 {
-  font-size: 2.4rem;
-  text-align: center;
-}
-
-h2 {
-  font-size: 1.6rem;
-  color: #ff8c3c; /* Added a subtle orange to headers to match the forge theme */
-}
-
-/* ===== SUBTLE FLICKER ===== */
-@keyframes ember {
-  0% { text-shadow: 0 0 10px rgba(255,100,40,0.4); }
-  50% { text-shadow: 0 0 18px rgba(255,60,20,0.6); }
-  100% { text-shadow: 0 0 10px rgba(255,100,40,0.4); }
-}
-
-.line.reveal {
-  animation: ember 4s infinite ease-in-out;
-}
-
-/* Make code blocks readable against the dark background */
-pre, code {
-    color: #00FFC0;
+    0 0 6px rgba(255,140,60,0.4),
+    0 0 18px rgba(255,60,20,0.3);
 }
 </style>
 </head>
 
 <body>
+
 <div class="black-paper">
   <div id="dynamic-sections"></div>
 </div>
@@ -157,9 +137,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   fetch('blackpaper.json')
     .then(res => res.json())
-    .then(data => renderSections(data.sections));
+    .then(data => renderSections(data.sections))
+    .catch(err => console.error("JSON Load Error:", err));
 
   function renderSections(sections) {
+
     const container = document.getElementById("dynamic-sections");
 
     sections.forEach(section => {
@@ -167,21 +149,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const sectionDiv = document.createElement("div");
       sectionDiv.className = "section line";
 
-      const h2 = document.createElement("h2");
-      h2.textContent = section.title;
-      sectionDiv.appendChild(h2);
-
-      if (section.intro) {
-        const p = document.createElement("p");
-        p.textContent = section.intro;
-        sectionDiv.appendChild(p);
+      if (section.title) {
+        const h2 = document.createElement("h2");
+        h2.textContent = section.title;
+        sectionDiv.appendChild(h2);
       }
 
-      // Modules
+      if (section.content) {
+        renderText(section.content, sectionDiv);
+      }
+
       if (section.modules) {
         section.modules.forEach(module => {
 
-          if (module.type === "module") {
+          if (module.type === "code-block") {
             const mod = document.createElement("div");
             mod.className = "module";
 
@@ -189,38 +170,50 @@ document.addEventListener("DOMContentLoaded", () => {
             h3.textContent = module.title;
             mod.appendChild(h3);
 
-            const ul = document.createElement("ul");
-            module.content.forEach(item => {
-              const li = document.createElement("li");
-              li.textContent = item;
-              ul.appendChild(li);
-            });
+            const pre = document.createElement("pre");
+            const code = document.createElement("code");
+            code.textContent = module.code;
+            pre.appendChild(code);
 
-            mod.appendChild(ul);
+            mod.appendChild(pre);
             sectionDiv.appendChild(mod);
           }
 
-          if (module.type === "advanced") {
-            const details = document.createElement("details");
-            details.className = "module";
+          if (module.type === "routing-grid") {
+            const mod = document.createElement("div");
+            mod.className = "module";
 
-            const summary = document.createElement("summary");
-            summary.textContent = module.title;
-            details.appendChild(summary);
+            const h3 = document.createElement("h3");
+            h3.textContent = module.title;
+            mod.appendChild(h3);
 
-            module.content.forEach(item => {
-              const p = document.createElement("p");
-              p.textContent = item;
-              details.appendChild(p);
+            if (module.intro) renderText(module.intro, mod);
+
+            const grid = document.createElement("div");
+            grid.className = "token-grid";
+
+            module.table.forEach(row => {
+              const card = document.createElement("div");
+              card.className = "token-card";
+              card.innerHTML = `
+                <h3>${row.method}</h3>
+                <p><strong>Field:</strong> ${row.field}</p>
+                <p><strong>Logic:</strong> ${row.logic}</p>
+                <p><strong>User:</strong> ${row.user}</p>
+              `;
+              grid.appendChild(card);
             });
 
-            sectionDiv.appendChild(details);
+            mod.appendChild(grid);
+
+            if (module.conclusion) renderText(module.conclusion, mod);
+
+            sectionDiv.appendChild(mod);
           }
 
         });
       }
 
-      // Tokenomics special renderer
       if (section.tokenomics) {
         const supply = document.createElement("p");
         supply.innerHTML = "<strong>Total Supply:</strong> " + section.tokenomics.total_supply;
@@ -232,32 +225,62 @@ document.addEventListener("DOMContentLoaded", () => {
         section.tokenomics.distribution.forEach(item => {
           const card = document.createElement("div");
           card.className = "token-card";
-          card.innerHTML = "<h4>" + item.percent + "%</h4><p>" + item.label + "</p>";
+          card.innerHTML = `
+            <h3>${item.percent}%</h3>
+            <p><strong>${item.label}</strong></p>
+          `;
           grid.appendChild(card);
         });
 
         sectionDiv.appendChild(grid);
+
+        if (section.tokenomics.additional_notes) {
+          renderText(section.tokenomics.additional_notes, sectionDiv);
+        }
+      }
+
+      if (section.conclusion) {
+        renderText(section.conclusion, sectionDiv);
       }
 
       container.appendChild(sectionDiv);
     });
 
-    igniteForge();
+    initScrollForge();
   }
 
-  function igniteForge() {
-    const lines = document.querySelectorAll(".line");
-    let delay = 0;
+  function renderText(text, parent) {
+    const paragraphs = text.split("\n\n");
 
-    lines.forEach((line) => {
-      setTimeout(() => {
-        line.classList.add("reveal");
-      }, delay);
-      delay += 700;
+    paragraphs.forEach(raw => {
+      const p = document.createElement("p");
+
+      // convert `inline code`
+      const formatted = raw.replace(/`([^`]+)`/g,
+        '<span class="inline-code">$1</span>'
+      );
+
+      p.innerHTML = formatted;
+      parent.appendChild(p);
     });
+  }
+
+  function initScrollForge() {
+    const lines = document.querySelectorAll(".line");
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("reveal");
+        }
+      });
+    }, { threshold: 0.2 });
+
+    lines.forEach(line => observer.observe(line));
   }
 
 });
 </script>
+
 </body>
 </html>

@@ -1,64 +1,113 @@
 {
   "sections": [
+
     {
-      "title": "1. The Architecture of the sXRP Bridge and XRPL Integration",
-      "intro": "The foundational component of the suite is the sXRP Bridge...",
-      "modules": [
+      "title": "Structural Engineering of Decentralized Liquidity",
+      "subtitle": "The Heretic Protocol and the sXRP-HXT Nexus",
+      "content": "The emergence of the Heretic Protocol signifies a technical watershed in the pursuit of cross-chain interoperability, specifically bridging the liquidity of the XRP Ledger (XRPL) with the scalable, validity-proven environment of Starknet. By architecting a high-frequency, low-latency conduit for XRP capital, the protocol enables a substantial legacy asset class to participate in the burgeoning decentralized finance (DeFi) ecosystem of the Starknet ZK-Rollup. This dissertation provides an exhaustive analysis of the protocol’s architecture, encompassing the engineering of the sequential relayer, the implementation of complex on-chain economic models through HereticToken (HXT), and the deployment of advanced risk-mitigation frameworks utilizing pull-based oracles and Automated Market Maker (AMM) extensions."
+    },
+
+    {
+      "title": " The Architecture of the sXRP Bridge and XRPL Integration",
+      "content": "The foundational component of the suite is the sXRP Bridge, which facilitates the issuance of a 1:1 backed synthetic XRP token on Starknet. Unlike traditional bridges that rely on centralized custodians, the Heretic suite utilizes a 'Door' address on the XRPL as a transparent vault. The operational security of this bridge is dependent on the precise interpretation of XRPL transaction metadata and the robust handling of incoming ledger events."
+    },
+
+    {
+      "title": "Transaction Verification and Metadata Analysis",
+      "content": "A critical vulnerability in cross-chain bridging is the 'Partial Payment' exploit, where a malicious actor utilizes the tfPartialPayment flag to deliver significantly less value than specified in the 'Amount' field of an XRPL transaction. The Heretic Protocol relayer is specifically engineered to mitigate this risk by ignoring the high-level Amount field and exclusively extracting value from the meta.delivered_amount metadata field. This represents the only reliable record of the actual currency received by the Door account.\n\nFurthermore, the relayer implements a rigorous validation filter that requires transactions to achieve a tesSUCCESS result code within a validated ledger version. Transactions with tec codes, such as tecPATH_DRY, are included in the ledger for fee-burning purposes but do not move funds, making them ineligible for synthetic minting on Starknet. The diagnostic logic of the relayer continuously monitors the transaction stream, utilizing WebSocket subscriptions to maintain real-time parity with the XRPL state."
+    },
+{
+  "title": "Address Resolution and Routing Mechanisms",
+  "modules": [
+    {
+      "type": "routing-grid",
+      "title": "Address Resolution and Routing Mechanisms",
+      "intro": "The protocol addresses the character-limit constraints of legacy exchange infrastructure through a hybrid routing system. Starknet addresses are 251-bit field elements, often represented as 66-character hex strings, which frequently exceed the \"Note\" or \"Memo\" character limits of centralized exchange (CEX) platforms like Coinbase. To ensure seamless bridging for all users, the relayer supports three distinct routing tiers:",
+      "table": [
         {
-          "type": "module",
-          "title": "Transaction Verification and Metadata Analysis",
-          "content": [
-            "Mitigating Partial Payment Exploits: Uses meta.delivered_amount.",
-            "Validation Filters: Requires tesSUCCESS in validated ledger.",
-            "Real-Time Parity: WebSocket ledger monitoring."
-          ]
+          "method": "Direct Memo",
+          "field": "Memos.MemoData",
+          "logic": "Hex decoding to 0x address",
+          "user": "Native XRPL Wallet Users"
         },
         {
-          "type": "module",
-          "title": "Address Resolution and Routing Mechanisms",
-          "content": [
-            "Direct Memo → Memos.MemoData",
-            "Destination Tag → Registry Mapping",
-            "Fallback Recipient → .env administrative address"
-          ]
-        }
-      ]
-    },
-    {
-      "title": "2. Engineering the Sequential Relayer and Nonce Management",
-      "intro": "The relayer translates XRPL state transitions into Starknet mint operations.",
-      "modules": [
-        {
-          "type": "module",
-          "title": "Sequential Processing and Mempool Integrity",
-          "content": [
-            "Strict sequential nonces enforced.",
-            "Global isProcessing lock.",
-            "Queue ensures ACCEPTED_ON_L2 confirmation."
-          ]
+          "method": "Destination Tag",
+          "field": "DestinationTag",
+          "logic": "On-chain Registry Mapping",
+          "user": "CEX and Mobile Users"
         },
         {
-          "type": "advanced",
-          "title": "Idempotency and Deduplication Logic",
-          "content": [
-            "processedHashes set prevents duplicate minting.",
-            "Check-and-Set pattern avoids race conditions."
-          ]
+          "method": "Fallback Recipient",
+          "field": ".env Configuration",
+          "logic": "Default administrative address",
+          "user": "Testnet and Debugging"
         }
-      ]
-    },
-    {
-      "title": "3. HereticToken (HXT) and the Economic Engine",
-      "intro": "HXT serves as the economic engine solving liquidity desert effects.",
-      "tokenomics": {
-        "total_supply": "100,000,000 HXT",
-        "distribution": [
-          { "label": "Initial Liquidity Sale", "percent": 40 },
-          { "label": "Ecosystem Incentives", "percent": 25 },
-          { "label": "Protocol Treasury", "percent": 20 },
-          { "label": "Founder & Development", "percent": 15 }
-        ]
-      }
+      ],
+      "conclusion": "For direct memo routing, the relayer decodes the hex-encoded data from the XRPL transaction and performs a validation check for the 0x prefix to ensure the recipient is a valid Starknet address. In instances where destination tags are used, the relayer queries an on-chain Registry contract to retrieve the mapped recipient address, facilitating \"link once, bridge forever\" functionality."
     }
+  ]
+},
+    {
+      "title": " Engineering the Sequential Relayer and Nonce Management",
+      "content": "The relayer serves as the bridge’s off-chain heart, translating XRPL state transitions into Starknet mint operations. Its development trajectory reveals critical technical hurdles, particularly regarding the evolution of the starknet.js SDK and the nuances of the Starknet transactional lifecycle."
+    },
+{
+  "title": "SDK Versioning and Account Initialization",
+  "content": "The transition to Starknet.js v9 introduced a significant breaking change in the Account constructor. Earlier versions allowed for positional arguments, but the modern SDK requires a unified configuration object. Initial relayer deployments failed with a `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`, which was identified as a normalization failure occurring when the constructor attempted to access a missing address property from an incorrectly structured argument list.",
+  "modules": [
+    {
+      "type": "code-block",
+      "title": "Correct Account Initialization Pattern (Starknet.js v9+)",
+      "language": "javascript",
+      "code": "const bridgeAccount = new Account({\n  provider: myProvider,\n  address: process.env.STARKNET_ACCOUNT_ADDRESS.trim(),\n  signer: process.env.STARKNET_PRIVATE_KEY.trim(),\n  cairoVersion: '1'\n});"
+    }
+  ],
+  "conclusion": "This pattern ensures that the account abstraction layer correctly identifies the signing key and normalizes the contract address, both of which are required for the `__validate__` and `__execute__` functions inherent in Starknet's native account model."
+},
+    {
+      "title": "Idempotency and Deduplication Logic",
+      "content": "To prevent duplicate minting—a catastrophic risk for bridge treasury management—the relayer employs a Check-and-Set idempotency guard. A processedHashes set tracks every XRPL transaction hash. This set must be updated immediately upon transaction detection rather than at the completion of the Starknet mint. This immediate deduplication prevents race conditions where rapid, successive XRP deposits might be queued multiple times before the first Starknet transaction is submitted."
+    },
+
+   {
+  "title": " HereticToken (HXT) and the Economic Engine",
+  "content": "While the bridge provides the infrastructure for asset movement, HereticToken (HXT) serves as the protocol’s economic engine, designed to solve the 'Liquidity Desert' problem common in wrapped assets.",
+  "tokenomics": {
+    "description": "Tokenomics",
+    "total_supply": "100,000,000 HXT",
+    "distribution": [
+      { "percent": 40, "label": "Initial Liquidity Sale" },
+      { "percent": 25, "label": "Ecosystem Incentives" },
+      { "percent": 20, "label": "Protocol Treasury" },
+      { "percent": 15, "label": "Founder & Development" }
+    ],
+    "additional_notes": "Founder allocation is secured through linear vesting. Buyback and burn mechanics convert bridge volume into token scarcity."
+  }
+},
+    {
+      "title": "4. The Risk Lab — Specialized Yield Strategy Vaults",
+      "content": "The primary value proposition for bridging XRP to Starknet through the Heretic Protocol is access to the Risk Lab—a suite of automated yield-generating vaults referred to as Risk Boxes."
+    },
+
+    {
+      "title": "5. Oracle Integration and Peg Maintenance",
+      "content": "To maintain the economic integrity of the 1:1 sXRP-XRP peg, the protocol integrates a pull-based oracle system and specialized AMM guardrails."
+    },
+
+    {
+      "title": "6. Starknet Roadmap and Future Infrastructure (2026–2028)",
+      "content": "The Heretic Protocol is positioned to evolve alongside Starknet’s transition toward decentralized sequencing, improved proving efficiency, and validator-based staking."
+    },
+
+    {
+      "title": "7. Security Frameworks and State Preservation",
+      "content": "The longevity of the Heretic Protocol is underpinned by rigorous security standards and adherence to the Universal Upgradeable Proxy Standard (UUPS), ensuring upgradeability without state migration."
+    },
+
+    {
+      "title": "Conclusion",
+      "content": "The Heretic Protocol represents a sophisticated fusion of XRPL liquidity and Starknet’s validity-proven execution environment. Through sequential relayer engineering, tiered yield strategies, price-aware AMM guardrails, and token scarcity mechanics, the protocol establishes a secure and productive home for XRP on Starknet."
+    }
+
   ]
 }

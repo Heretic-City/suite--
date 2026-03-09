@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sXRP Mainnet Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/starknet@6.11.0/dist/web.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>sXRP (HXT) Explorer</h1>
+        <div class="card">
+            <p><strong>Mainnet Address:</strong><br>
+               <small id="addr-display">0x05fc5...8181c</small>
+            </p>
+            <p><strong>Total Supply:</strong> <span id="supply-value">Loading...</span> HXT</p>
+            <button id="refresh-btn">Query Blockchain</button>
+            <p id="status-msg">Ready</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

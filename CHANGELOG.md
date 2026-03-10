@@ -5,3 +5,4 @@
 #I guess I'm bad
 #removed folder maybe this workds 
 #pointed directly to page.tsx
+#change places

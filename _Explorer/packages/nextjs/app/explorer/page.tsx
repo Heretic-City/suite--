@@ -372,7 +372,7 @@ export default function Explorer() {
         {sxrpTab === "LAB" && (
           <div className="bg-base-200 rounded-xl p-6 text-center border border-base-content/10">
             <h3 className="text-lg font-bold mb-2">DeFi Lab</h3>
-            <p className="text-sm opacity-70">Utilize your sXRP across Starknet's top lending and borrowing protocols.</p>
+            <p className="text-sm opacity-70">Utilize your sXRP across Starknet&apos;s top lending and borrowing protocols.</p>
             <div className="mt-4 badge badge-outline opacity-50">Integrations Pending</div>
           </div>
         )}

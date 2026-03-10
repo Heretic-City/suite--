@@ -33,11 +33,6 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "Blackpaper",
     href: "/blackpaper",
   },
-  // {
-  //   label: "Debug Contracts",
-  //   href: "/debug",
-  //   icon: <BugAntIcon className="h-4 w-4" />,
-  // },
 ];
 
 export const HeaderMenuLinks = () => {
@@ -62,6 +57,12 @@ export const HeaderMenuLinks = () => {
                   ? "bg-gradient-nav text-white! active:bg-gradient-nav shadow-md"
                   : ""
               } py-1.5 px-3 text-sm rounded-full gap-2 grid grid-flow-col hover:bg-gradient-nav hover:text-white`}
+              onClick={() => {
+                // Ensure the DaisyUI dropdown loses focus when a link is clicked
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
+              }}
             >
               {icon}
               <span>{label}</span>
@@ -77,12 +78,16 @@ export const HeaderMenuLinks = () => {
  * Site header
  */
 export const Header = () => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const burgerMenuRef = useRef<HTMLDivElement>(null);
 
+  // Still useful for clicking outside the menu to close it
   useOutsideClick(
     burgerMenuRef,
-    useCallback(() => setIsDrawerOpen(false), []),
+    useCallback(() => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+    }, []),
   );
 
   const { targetNetwork } = useTargetNetwork();
@@ -124,33 +129,21 @@ export const Header = () => {
   ]);
 
   return (
-    <div className=" lg:static top-0 navbar min-h-0 shrink-0 justify-between z-20 px-0 sm:px-2">
+    <div className="sticky lg:static top-0 navbar bg-base-100 min-h-0 shrink-0 justify-between z-[100] px-2 shadow-md">
       <div className="navbar-start w-auto lg:w-1/2 -mr-2">
-        <div className="lg:hidden dropdown" ref={burgerMenuRef}>
+        <div className="lg:hidden dropdown relative" ref={burgerMenuRef}>
           <label
             tabIndex={0}
-            className={`ml-1 btn btn-ghost 
-              [@media(max-width:379px)]:px-3! [@media(max-width:379px)]:py-1! 
-              [@media(max-width:379px)]:h-9! [@media(max-width:379px)]:min-h-0!
-              [@media(max-width:379px)]:w-10!
-              ${isDrawerOpen ? "hover:bg-secondary" : "hover:bg-transparent"}`}
-            onClick={() => {
-              setIsDrawerOpen((prevIsOpenState) => !prevIsOpenState);
-            }}
+            className="ml-1 btn btn-ghost [@media(max-width:379px)]:px-3! [@media(max-width:379px)]:py-1! [@media(max-width:379px)]:h-9! [@media(max-width:379px)]:min-h-0! [@media(max-width:379px)]:w-10!"
           >
-            <Bars3Icon className="h-1/2" />
+            <Bars3Icon className="h-6 w-6" />
           </label>
-          {isDrawerOpen && (
-            <ul
-              tabIndex={0}
-              className="menu menu-compact dropdown-content mt-3 p-2 shadow-sm rounded-box w-52 bg-base-100"
-              onClick={() => {
-                setIsDrawerOpen(false);
-              }}
-            >
-              <HeaderMenuLinks />
-            </ul>
-          )}
+          <ul
+            tabIndex={0}
+            className="menu menu-compact dropdown-content mt-3 p-2 shadow-xl bg-base-200 rounded-box w-52 border border-primary z-[150]"
+          >
+            <HeaderMenuLinks />
+          </ul>
         </div>
         <Link
           href="/"

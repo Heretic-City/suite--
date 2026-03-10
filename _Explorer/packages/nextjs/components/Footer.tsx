@@ -72,7 +72,7 @@ export const Footer = () => {
       <div className="w-full">
         <ul className="menu menu-horizontal w-full">
           <div className="flex justify-center items-center gap-2 text-sm w-full">
-            <div className="text-center">
+            {/* <div className="text-center">
               <a
                 href="https://github.com/Scaffold-Stark/scaffold-stark-2"
                 target="_blank"
@@ -81,16 +81,16 @@ export const Footer = () => {
               >
                 Fork me
               </a>
-            </div>
+            </div> */}
 
             <div className="text-center">
               <a
-                href="https://t.me/+wO3PtlRAreo4MDI9"
+                href="https://t.me/+bn12UOf5Ts8zNmI5"
                 target="_blank"
                 rel="noreferrer"
                 className="link"
               >
-                Support
+                support
               </a>
             </div>
           </div>

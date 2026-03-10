@@ -4,3 +4,4 @@
 #4th time's the charm
 #I guess I'm bad
 #removed folder maybe this workds 
+#pointed directly to page.tsx

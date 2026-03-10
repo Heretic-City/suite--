@@ -1,5 +1,5 @@
 {
-  "name": "@ss-2/nextjs",
+  "name": "explorer-frontend",
   "version": "0.1.2",
   "private": true,
   "scripts": {

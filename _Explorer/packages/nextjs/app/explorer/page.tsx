@@ -10,11 +10,11 @@ import deployedContracts from "~~/contracts/deployedContracts";
 const HXT_DATA = configExternalContracts.mainnet?.[" Heretic Token"] || configExternalContracts.mainnet?.["Heretic Token"];
 const SXRP_DATA = configExternalContracts.mainnet?.[" Starknet XRP"] || configExternalContracts.mainnet?.["Starknet XRP"];
 
-const VESTING_DATA = 
-  deployedContracts.mainnet?.HXTVestingVault || 
+const VESTING_DATA =
+  deployedContracts.mainnet?.HXTVestingVault ||
   deployedContracts.mainnet?.[" HXTVestingVault"] ||
-  configExternalContracts.mainnet?.HXTVestingVault || 
-  configExternalContracts.mainnet?.[" HXTVestingVault"]; 
+  configExternalContracts.mainnet?.HXTVestingVault ||
+  configExternalContracts.mainnet?.[" HXTVestingVault"];
 
 const XRPL_VAULT_ADDRESS = "rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7";
 const PYTH_STARKNET_ADDRESS = "0x028c85e2fb2f9c37b27519ea4bfdf599f52f11815147816f5c5b967ed43ff455";
@@ -46,7 +46,6 @@ const MINIMAL_PYTH_ABI = [
 export default function Explorer() {
   const { address, isConnected } = useAccount();
   const { provider } = useProvider();
-  const { connect, connectors } = useConnect();
 
   // --- UI TAB STATE ---
   const [activeCard, setActiveCard] = useState<"SXRP" | "HXT" | null>(null);
@@ -54,6 +53,10 @@ export default function Explorer() {
   const [bridgeMode, setBridgeMode] = useState<"DEPOSIT" | "WITHDRAW">("DEPOSIT");
   const [hxtTab, setHxtTab] = useState<"GOVERN">("GOVERN");
   const [copiedText, setCopiedText] = useState("");
+
+  // --- INTENT-BASED BRIDGING STATE ---
+  const [selectedRisk, setSelectedRisk] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
 
   const [currentTimestamp, setCurrentTimestamp] = useState(Math.floor(Date.now() / 1000));
 
@@ -82,10 +85,10 @@ export default function Explorer() {
   });
 
   const { data: sxrpTotalSupply, isFetching: sxrpSupplyLoading, error: sxrpSupplyError } = useReadContract({
-    functionName: "total_supply", 
+    functionName: "total_supply",
     abi: SXRP_DATA?.abi,
     address: SXRP_DATA?.address,
-    args: [], 
+    args: [],
     watch: true,
   });
 
@@ -195,42 +198,40 @@ export default function Explorer() {
     setTimeout(() => setCopiedText(""), 2000);
   };
 
-  const handleCreateWallet = () => {
-    const cartridge = connectors.find(c => c.id.toLowerCase().includes('controller') || c.id.toLowerCase().includes('cartridge'));
-    if (cartridge) {
-      connect({ connector: cartridge });
-    } else {
-      connect({ connector: connectors[0] });
-    }
-  };
-
   // --- DEPOSIT DB REGISTRATION LOGIC ---
   const handleRegisterTag = async () => {
-    if (!address) return;
+    if (!address) {
+      alert("Please connect your Starknet wallet first.");
+      return;
+    }
+    
     setIsRegisteringTag(true);
-    
-    // Generate a 9-digit random number (fits safely in XRPL's 32-bit uint destination tag limit)
+
+    // Generate a 9-digit random number
     const generatedTag = Math.floor(100000000 + Math.random() * 900000000);
-    
+
     try {
-      /* // TODO: Uncomment and point to your EC2 Relayer API endpoint
-      const response = await fetch("https://YOUR_EC2_IP/api/register-bridge-tag", {
+      // ✅ EC2 API CALL ENABLED
+      const response = await fetch("http://54.82.191.189:3001/api/store-memo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ destinationTag: generatedTag, starknetAddress: address })
+        body: JSON.stringify({ 
+          starknetAddress: address, 
+          xrpMemo: generatedTag,
+          riskLevel: selectedRisk, // Sending the intent payload
+          isLocked: isLocked,      // Sending the lock modifier
+          timestamp: new Date().toISOString()
+        })
       });
+
+      if (!response.ok) throw new Error("Failed to save to database");
       
-      if (!response.ok) throw new Error("Failed to register with relayer");
-      */
-      
-      // Simulating a successful DB save for now
-      await new Promise(resolve => setTimeout(resolve, 800)); 
-      
+      // Update UI on success
       setDestTag(generatedTag);
       setTagRegistered(true);
     } catch (error) {
       console.error("Error registering tag:", error);
-      alert("Failed to connect to relayer database. Please try again.");
+      alert("Failed to connect to relayer database. Please ensure your EC2 Node server is running.");
     } finally {
       setIsRegisteringTag(false);
     }
@@ -250,6 +251,7 @@ export default function Explorer() {
   }, [destXrplAddress, withdrawAmount]);
 
   const { sendAsync: executeWithdraw, isPending: isWithdrawing } = useSendTransaction({ calls: withdrawCalls });
+  
   const handleWithdraw = async () => {
     if (withdrawCalls.length === 0) return;
     try {
@@ -274,90 +276,133 @@ export default function Explorer() {
     return (
       <div className="flex flex-col gap-4 animate-fadeIn">
         <div role="tablist" className="tabs tabs-boxed bg-base-200">
-          <a role="tab" className={`tab font-bold ${sxrpTab === "BRIDGE" ? "tab-active bg-secondary text-secondary-content" : ""}`} onClick={() => setSxrpTab("BRIDGE")}>BRIDGE</a>
-          <a role="tab" className={`tab font-bold ${sxrpTab === "LOCK" ? "tab-active bg-secondary text-secondary-content" : ""}`} onClick={() => setSxrpTab("LOCK")}>LOCK</a>
-          <a role="tab" className={`tab font-bold ${sxrpTab === "LAB" ? "tab-active bg-secondary text-secondary-content" : ""}`} onClick={() => setSxrpTab("LAB")}>LAB</a>
+          <a role="tab" className={`tab font-bold ${sxrpTab === "BRIDGE" ? "tab-active bg-secondary text-white!" : ""}`} onClick={() => setSxrpTab("BRIDGE")}>BRIDGE</a>
+          <a role="tab" className={`tab font-bold ${sxrpTab === "LOCK" ? "tab-active bg-secondary text-white!" : ""}`} onClick={() => setSxrpTab("LOCK")}>LOCK</a>
+          <a role="tab" className={`tab font-bold ${sxrpTab === "LAB" ? "tab-active bg-secondary text-white!" : ""}`} onClick={() => setSxrpTab("LAB")}>LAB</a>
         </div>
 
         {sxrpTab === "BRIDGE" && (
           <div className="bg-base-200 rounded-xl p-4 border border-base-content/10">
-            {!isConnected ? (
-              <div className="text-center py-6">
-                <h3 className="text-xl font-bold mb-2">Bridge Your XRP</h3>
-                <p className="text-sm opacity-70 mb-6">You need a Starknet address to receive your sXRP. Create a smart wallet instantly with Cartridge (No seed phrases required).</p>
-                <button onClick={handleCreateWallet} className="btn btn-secondary w-full shadow-lg hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                  NEW WALLET
-                </button>
+            <div>
+              <div className="flex justify-center gap-2 mb-4">
+                <button className={`btn btn-xs ${bridgeMode === "DEPOSIT" ? "btn-secondary text-white! font-bold" : "btn-ghost"}`} onClick={() => setBridgeMode("DEPOSIT")}>Deposit (XRPL → Starknet)</button>
+                <button className={`btn btn-xs ${bridgeMode === "WITHDRAW" ? "btn-error text-white! font-bold" : "btn-ghost"}`} onClick={() => setBridgeMode("WITHDRAW")}>Withdraw (Burn)</button>
               </div>
-            ) : (
-              <div>
-                <div className="flex justify-center gap-2 mb-4">
-                  <button className={`btn btn-xs ${bridgeMode === "DEPOSIT" ? "btn-secondary" : "btn-ghost"}`} onClick={() => setBridgeMode("DEPOSIT")}>Deposit (XRPL → Starknet)</button>
-                  <button className={`btn btn-xs ${bridgeMode === "WITHDRAW" ? "btn-error" : "btn-ghost"}`} onClick={() => setBridgeMode("WITHDRAW")}>Withdraw (Burn)</button>
-                </div>
 
-                {bridgeMode === "DEPOSIT" ? (
-                  <div className="space-y-4">
-                    {!tagRegistered ? (
-                      <div className="bg-base-100 p-5 rounded-lg border border-secondary text-center shadow-[0_0_15px_rgba(var(--color-secondary),0.1)]">
-                        <p className="text-sm font-bold mb-2">Step 1: Link Address</p>
-                        <p className="text-xs opacity-70 mb-4">Generate a unique Destination Tag to link your Starknet wallet to our relayer database.</p>
-                        <button 
-                          onClick={handleRegisterTag} 
-                          className="btn btn-secondary btn-sm w-full"
-                          disabled={isRegisteringTag}
-                        >
-                          {isRegisteringTag ? <span className="loading loading-spinner"></span> : "Generate & Register Tag"}
-                        </button>
+              {bridgeMode === "DEPOSIT" ? (
+                <div className="space-y-4">
+                  {!tagRegistered ? (
+                    <div className="bg-base-100 p-5 rounded-lg border border-secondary text-center shadow-[0_0_15px_rgba(var(--color-secondary),0.1)]">
+                      <p className="text-sm font-bold mb-4">Step 1: Configure Route & Link Address</p>
+                      
+                      {/* --- NEW ASSET SPREAD INTENT UI --- */}
+                      <div className="mb-6 text-left">
+                        <p className="text-[11px] font-bold mb-2 uppercase opacity-80">Select Target Asset Spread:</p>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {[
+                            { id: 1, name: "Pure Liquid", desc: "100% sXRP" },
+                            { id: 2, name: "Stable Yield", desc: "50% sXRP / 50% USDC" },
+                            { id: 3, name: "Ecosystem", desc: "50% sXRP / 50% STRK" },
+                            { id: 4, name: "Heretic Max", desc: "100% HXT" },
+                          ].map((risk) => (
+                            <button
+                              key={risk.id}
+                              onClick={() => setSelectedRisk(risk.id)}
+                              className={`p-2 rounded border text-left flex flex-col transition-all ${
+                                selectedRisk === risk.id 
+                                  ? "bg-secondary/20 border-secondary text-secondary shadow-[0_0_8px_rgba(var(--color-secondary),0.4)]" 
+                                  : "bg-base-300 border-base-content/10 hover:border-secondary/50 text-base-content/70"
+                              }`}
+                              disabled={!isConnected}
+                            >
+                              <span className={`text-xs font-bold ${selectedRisk === risk.id ? 'text-secondary' : ''}`}>{risk.name}</span>
+                              <span className="text-[9px] opacity-70 mt-0.5">{risk.desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div className={`flex items-center gap-3 p-3 rounded border transition-colors ${isLocked ? 'bg-accent/10 border-accent/40' : 'bg-base-300 border-base-content/10'}`}>
+                          <input 
+                            type="checkbox" 
+                            className="toggle toggle-sm toggle-accent" 
+                            checked={isLocked}
+                            onChange={(e) => setIsLocked(e.target.checked)}
+                            disabled={!isConnected}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-base-content">Lock assets for 8 Days</span>
+                            <span className="text-[9px] opacity-70">Boosts ecosystem yield multiplier</span>
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="bg-base-100 p-3 rounded-lg border border-base-content/20">
-                          <p className="text-xs font-bold opacity-70 mb-1">Step 2: Send XRP to Vault</p>
-                          <div className="flex items-center justify-between gap-2">
-                            <code className="text-[10px] break-all text-info">{XRPL_VAULT_ADDRESS}</code>
-                            <button onClick={() => handleCopy(XRPL_VAULT_ADDRESS, "vault")} className="btn btn-xs btn-square btn-ghost">
-                              {copiedText === "vault" ? <span className="text-success">✓</span> : "Copy"}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="bg-base-100 p-3 rounded-lg border border-secondary shadow-[0_0_10px_rgba(var(--color-secondary),0.2)]">
-                          <p className="text-xs font-bold text-secondary mb-1">Step 3: Include Destination Tag!</p>
-                          <p className="text-[10px] opacity-70 mb-2">You <strong className="text-error">MUST</strong> include this exact tag in your XRP transfer or funds will be lost.</p>
-                          <div className="flex items-center justify-between gap-2 bg-base-300 p-2 rounded">
-                            <code className="text-sm font-bold text-secondary tracking-widest">{destTag}</code>
-                            <button onClick={() => handleCopy(destTag?.toString() || "", "tag")} className="btn btn-xs btn-square btn-secondary">
-                              {copiedText === "tag" ? "✓" : "Copy"}
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    
-                    <div className="mt-4 pt-4 border-t border-base-content/10 text-center">
-                       <p className="text-xs opacity-50 mb-2">Or buy crypto directly with card</p>
-                       <button className="btn btn-outline btn-sm w-full opacity-50 cursor-not-allowed" disabled>Topper Integration Coming Soon</button>
+                      
+                      {/* CONDITIONAL BUTTON RENDER */}
+                      {!isConnected ? (
+                        <button className="btn btn-secondary btn-sm w-full opacity-50 cursor-not-allowed !text-white" disabled>
+                          Connect Wallet to Configure
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleRegisterTag}
+                          className={`btn btn-secondary btn-sm w-full !text-white font-bold ${selectedRisk === null ? 'opacity-50' : ''}`}
+                          disabled={isRegisteringTag || selectedRisk === null}
+                        >
+                          {isRegisteringTag ? <span className="loading loading-spinner"></span> : selectedRisk === null ? "Select Spread to Generate Memo" : "Generate & Register Memo"}
+                        </button>
+                      )}
                     </div>
+                  ) : (
+                    <>
+                      <div className="bg-base-100 p-3 rounded-lg border border-base-content/20">
+                        <p className="text-xs font-bold opacity-70 mb-1">Step 2: Send XRP to Vault</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <code className="text-[10px] break-all text-info">{XRPL_VAULT_ADDRESS}</code>
+                          <button onClick={() => handleCopy(XRPL_VAULT_ADDRESS, "vault")} className="btn btn-xs btn-square btn-ghost">
+                            {copiedText === "vault" ? <span className="text-success">✓</span> : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="bg-base-100 p-3 rounded-lg border border-secondary shadow-[0_0_10px_rgba(var(--color-secondary),0.2)]">
+                        <p className="text-xs font-bold text-secondary mb-1">Step 3: Include Memo!</p>
+                        <p className="text-[10px] opacity-70 mb-2">You <strong className="text-error">MUST</strong> include this exact Memo / Destination Tag in your XRP transfer. It contains your routing spread.</p>
+                        <div className="flex items-center justify-between gap-2 bg-base-300 p-2 rounded">
+                          <code className="text-sm font-bold text-secondary tracking-widest">{destTag}</code>
+                          <button onClick={() => handleCopy(destTag?.toString() || "", "tag")} className="btn btn-xs btn-square btn-secondary">
+                            {copiedText === "tag" ? "✓" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className="mt-4 pt-4 border-t border-base-content/10 text-center">
+                     <p className="text-xs opacity-50 mb-2">Or buy crypto directly with card</p>
+                     <button className="btn btn-outline btn-sm w-full opacity-50 cursor-not-allowed" disabled>Topper Integration Coming Soon</button>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="form-control">
-                      <label className="label py-1"><span className="label-text text-xs font-semibold">Dest. XRPL Address</span></label>
-                      <input type="text" placeholder="r..." className={`input input-sm input-bordered w-full ${withdrawError ? 'input-error' : ''}`} value={destXrplAddress} onChange={(e) => setDestXrplAddress(e.target.value)} />
-                    </div>
-                    <div className="form-control">
-                      <label className="label py-1"><span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span></label>
-                      <input type="number" step="0.01" placeholder="0.00" className="input input-sm input-bordered w-full" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
-                    </div>
-                    {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
-                    <button className={`btn btn-error btn-sm w-full mt-2 ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={!withdrawAmount || !destXrplAddress || !!withdrawError}>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="form-control">
+                    <label className="label py-1"><span className="label-text text-xs font-semibold">Dest. XRPL Address</span></label>
+                    <input type="text" placeholder="r..." className={`input input-sm input-bordered w-full ${withdrawError ? 'input-error' : ''}`} value={destXrplAddress} onChange={(e) => setDestXrplAddress(e.target.value)} disabled={!isConnected} />
+                  </div>
+                  <div className="form-control">
+                    <label className="label py-1"><span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span></label>
+                    <input type="number" step="0.01" placeholder="0.00" className="input input-sm input-bordered w-full" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} disabled={!isConnected} />
+                  </div>
+                  {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
+                  
+                  {!isConnected ? (
+                    <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>
+                      Connect Wallet to Burn
+                    </button>
+                  ) : (
+                    <button className={`btn btn-error btn-sm w-full mt-2 !text-white font-bold ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={!withdrawAmount || !destXrplAddress || !!withdrawError}>
                       {isWithdrawing ? "Burning..." : "Confirm Burn"}
                     </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -410,14 +455,14 @@ export default function Explorer() {
       <h1 className="text-4xl font-bold mb-8 text-primary">Asset Explorer</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mb-12 items-start">
-        
+
         {/* --- HXT CARD --- */}
         <div className="card bg-base-100 shadow-xl border-t-4 border-primary">
           <div className="card-body">
             <div className="flex justify-between items-center mb-4">
               <h2 className="card-title opacity-70">HXT Dashboard</h2>
-              <button 
-                onClick={() => setActiveCard(activeCard === "HXT" ? null : "HXT")} 
+              <button
+                onClick={() => setActiveCard(activeCard === "HXT" ? null : "HXT")}
                 className={`btn btn-circle btn-sm btn-ghost ${activeCard === "HXT" ? 'bg-primary/20' : 'bg-base-200'}`}
                 title="Manage HXT"
               >
@@ -433,8 +478,8 @@ export default function Explorer() {
           <div className="card-body">
             <div className="flex justify-between items-center mb-4">
               <h2 className="card-title opacity-70">sXRP Dashboard</h2>
-              <button 
-                onClick={() => setActiveCard(activeCard === "SXRP" ? null : "SXRP")} 
+              <button
+                onClick={() => setActiveCard(activeCard === "SXRP" ? null : "SXRP")}
                 className={`btn btn-circle btn-sm btn-ghost ${activeCard === "SXRP" ? 'bg-secondary/20' : 'bg-base-200'}`}
                 title="Manage sXRP"
               >
@@ -507,7 +552,7 @@ export default function Explorer() {
         <div className="w-full max-w-4xl bg-base-200 text-base-content p-8 rounded-2xl shadow-xl relative mb-12 border-t-4 border-accent">
           <div className="absolute top-0 right-0 bg-accent text-accent-content px-4 py-1 rounded-bl-2xl font-bold text-sm shadow-sm">Vesting Contract</div>
           <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">⏳ HXT Vesting Vault</h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="bg-base-100 p-5 rounded-xl border border-base-content/10 text-center shadow-sm">
               <p className="text-xs uppercase opacity-60 font-bold mb-2">Total Locked (HXT)</p>

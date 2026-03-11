@@ -110,15 +110,15 @@ To run the Heretic City frontend and relayer locally, follow these steps.
 * **Scarb & Cairo:** The build toolchain for Starknet contracts.
   ```sh
   curl --proto '=https' --tlsv1.2 -sSf [https://docs.swmansion.com/scarb/install.sh](https://docs.swmansion.com/scarb/install.sh) | sh
-Node.js & Yarn: Required for the Next.js frontend and the Relayer script.
 
-Starknet Wallet: Argent X or Braavos browser extension.
+  * **Node.js & Yarn:** Required for the Next.js frontend and the Relayer script.
+* **Starknet Wallet:** Argent X or Braavos browser extension.
 
-Installation
-Clone the repo
+### Installation
 
-Bash
-git clone [https://github.com/Heretic-City/suite--.git](https://github.com/Heretic-City/suite--.git)
+1. **Clone the repo**
+   ```sh
+   git clone [https://github.com/Heretic-City/suite--.git](https://github.com/Heretic-City/suite--.git)
 Install Frontend Dependencies (Scaffold-Stark)
 
 Bash
@@ -142,6 +142,8 @@ Roadmap
 [x] Deploy Intent-Based Routing Memo Architecture
 
 [x] Integrate Pyth Oracle live feeds
+
+[ ] Integrate Controller by Cartridge for seamless, session-based wallet onboarding
 
 [ ] Automate Debridge / Withdraw Flow
 

@@ -236,7 +236,7 @@ https://vercel.com/docs/deployments
 
 ## License
 
-Unlicense
+MIT
 
 ---
 

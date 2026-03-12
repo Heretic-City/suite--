@@ -17,7 +17,7 @@
   <p align="center">
     A decentralized cross-chain ecosystem routing XRPL liquidity directly into Starknet's ZK-Rollup DeFi ecosystem via encoded intents.
     <br />
-    <a href="https://heretic.city/blackpaper"><strong>Read the Blackpaper »</strong></a>
+    <a href="https://www.heretic.city/blackpaper"><strong>Read the Blackpaper »</strong></a>
     <br /><br />
     <a href="https://www.heretic.city/explorer">Launch App</a>
     ·

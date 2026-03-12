@@ -18,8 +18,7 @@
     A decentralized cross-chain ecosystem routing XRPL liquidity directly into Starknet's ZK-Rollup DeFi ecosystem via encoded intents.
     <br />
     <a href="https://heretic.city/blackpaper"><strong>Read the Blackpaper »</strong></a>
-    <br />
-    <br />
+    <br /><br />
     <a href="https://www.heretic.city/explorer">Launch App</a>
     ·
     <a href="https://bithomp.com/en/account/rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7">View XRPL Vault</a>
@@ -28,132 +27,227 @@
   </p>
 </div>
 
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#the-architecture">The Architecture</a></li>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li><a href="#smart-contracts--addresses">Smart Contracts & Addresses</a></li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#license">License</a></li>
-  </ol>
-</details>
+---
+
+## Table of Contents
+
+- About The Project
+- Architecture
+- Built With
+- Smart Contracts & Addresses
+- Getting Started
+- Roadmap
+- License
+
+---
 
 ## About The Project
 
-Heretic City is not just a token wrapper; it is an **Intent-Based Cross-Chain Router**. We built a decentralized infrastructure focused on bridging the XRP Ledger's massive liquidity directly into Starknet's high-speed ZK-DeFi ecosystem. 
+Heretic City is an **Intent-Based Cross-Chain Router** connecting  
+**XRPL liquidity → Starknet ZK DeFi** using encoded deposit intents.
 
-By utilizing a secure, off-chain relayer node, users can deposit native XRP and have it automatically minted as **sXRP** (Starknet XRP) at a 1:1 ratio. During the deposit phase, users generate a unique `Destination Tag` (Memo) that encodes their specific DeFi intent (e.g., locking for yield, splitting into stablecoins, or pure liquid holding), which our relayer executes on Starknet instantly.
+Users send XRP with a memo tag → relayer decodes intent →  
+Cairo contract mints **sXRP 1:1 on Starknet**.
 
-**Key Ecosystem Components:**
-* **XRPL Vault:** Secure mainnet custody of native XRP assets.
-* **sXRP Token:** A 1:1 pegged liquidity asset natively deployed on Starknet.
-* **HXT Token:** Governance and utility token powering the Heretic ecosystem.
-* **Vesting Vaults:** Ecosystem contracts allowing users to lock HXT for boosted network multipliers.
-* **Pyth Oracle Guard:** Live on-chain price parity monitoring to ensure bridge integrity.
+### Ecosystem Components
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+- XRPL Vault
+- sXRP Token
+- HXT Token
+- Vesting Vaults
+- Pyth Oracle Guard
+- Relayer Node
+- Intent Memo Router
 
-### The Architecture (How it Works)
+---
 
-1. **Intent Generation:** The frontend generates a unique 9-digit `Destination Tag` linked to the user's Starknet address and selected risk spread. This is stored in our relayer's SQLite database.
-2. **XRPL Execution:** The user sends native XRP to the Heretic Vault, including the `Destination Tag`.
-3. **Relayer Node:** Our AWS EC2 node, powered by `xrpl.js`, listens to the live ledger via WebSockets. Upon detecting a successful payment, it queries the database to decode the user's intent.
-4. **Starknet Minting:** Using `starknet.js`, the relayer executes a highly-efficient **V3 Transaction** (paying gas fees in `STRK`), calling the Cairo smart contract to mint the exact 18-decimal equivalent of sXRP directly to the user's Starknet wallet.
+## Architecture
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+1. Frontend generates Destination Tag  
+2. User sends XRP to vault  
+3. Relayer reads ledger via WebSocket  
+4. Relayer decodes memo intent  
+5. Starknet contract mints sXRP  
 
-### Built With
+Relayer stack:
 
-This project integrates multiple bleeding-edge Web3 technologies. Documentation for our stack can be found below:
+- xrpl.js
+- starknet.js
+- sqlite
+- express
+- AWS EC2
 
-* [![Starknet][Starknet-badge]][Starknet-url] - ZK-Rollup Layer 2 scaling
-* [![Cairo][Cairo-badge]][Cairo-url] - Turing-complete language for Starknet smart contracts
-* [![XRPL][XRPL-badge]][XRPL-url] - The XRP Ledger via `xrpl.js` for mainnet liquidity
-* [![Next.js][Next.js]][Next-url] - Frontend framework powered by Scaffold-Stark 2
-* [![Node.js][Node-badge]][Node-url] - Core relayer backend and API
-* [![Pyth Network][Pyth-badge]][Pyth-url] - Sub-second, on-chain oracle price feeds
-* [![Tailwind CSS][Tailwind-badge]][Tailwind-url] - Utility-first CSS framework for UI styling
-* [![AWS EC2][AWS-badge]][AWS-url] - Cloud infrastructure hosting the relayer node
+---
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+## Built With
+
+- Starknet
+- Cairo
+- XRPL
+- Next.js / Scaffold-Stark 2
+- Node.js
+- Tailwind
+- Pyth Oracle
+- AWS EC2
+
+---
 
 ## Smart Contracts & Addresses
 
-| Asset/Contract | Network | Address / Hash |
-| :--- | :--- | :--- |
-| **XRPL Vault** | XRPL Mainnet | [`rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7`](https://bithomp.com/en/account/rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7) |
-| **sXRP Token** | Starknet Mainnet | [`0x05483f80138a35ee902febe115e831ab3fe3126ce54c272c809cabd2984d530c`](https://voyager.online/contract/0x05483f80138a35ee902febe115e831ab3fe3126ce54c272c809cabd2984d530c) |
-| **HXT Token** | Starknet Mainnet | [`0x05fc519eb3EA97146c47550707c2D8473E7373b80AFE41f89596870f2118181c`](https://voyager.online/contract/0x05fc519eb3EA97146c47550707c2D8473E7373b80AFE41f89596870f2118181c) |
-| **HXT Vesting** | Starknet Mainnet | [`0x0641d232db5fa521659d507dfedd010650a96121addd0d910a67cb9d7558fe8e`](https://voyager.online/contract/0x0641d232db5fa521659d507dfedd010650a96121addd0d910a67cb9d7558fe8e) |
+| Contract | Network | Address |
+|----------|----------|----------|
+| XRPL Vault | XRPL | rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7 |
+| sXRP | Starknet | 0x05483f80138a35ee902febe115e831ab3fe3126ce54c272c809cabd2984d530c |
+| HXT | Starknet | 0x05fc519eb3EA97146c47550707c2D8473E7373b80AFE41f89596870f2118181c |
+| Vesting | Starknet | 0x0641d232db5fa521659d507dfedd010650a96121addd0d910a67cb9d7558fe8e |
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+---
 
-## Getting Started
+# Getting Started
 
-To run the Heretic City frontend and relayer locally, follow these steps.
+Run frontend + contracts + relayer locally.
 
-### Prerequisites
+---
 
-* **Scarb & Cairo:** The build toolchain for Starknet contracts.
-  ```sh
-  curl --proto '=https' --tlsv1.2 -sSf [https://docs.swmansion.com/scarb/install.sh](https://docs.swmansion.com/scarb/install.sh) | sh
+## Prerequisites
 
-  * **Node.js & Yarn:** Required for the Next.js frontend and the Relayer script.
-* **Starknet Wallet:** Argent X or Braavos browser extension.
+### Windows users
 
-### Installation
+Use WSL2
 
-1. **Clone the repo**
-   ```sh
-   git clone [https://github.com/Heretic-City/suite--.git](https://github.com/Heretic-City/suite--.git)
-Install Frontend Dependencies (Scaffold-Stark)
+https://learn.microsoft.com/en-us/windows/wsl/install
 
-Bash
-cd suite--/packages/nextjs
+### Node + Yarn
+
+Install Node 18+
+
+### Scarb + Cairo
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh
+```
+
+### Wallet
+
+Install
+
+- Argent X
+- Braavos
+
+---
+
+## Clone repo
+
+```bash
+git clone https://github.com/Heretic-City/suite--.git
+cd suite--
+```
+
+---
+
+## Install frontend
+
+```bash
+cd packages/nextjs
 yarn install
-Run the Next.js App
+```
 
-Bash
+---
+
+## Environment setup
+
+Create
+
+```
+packages/nextjs/.env.local
+```
+
+Add
+
+```env
+NEXT_PUBLIC_ALCHEMY_API_KEY=your_key
+NEXT_PUBLIC_NETWORK=mainnet
+```
+
+---
+
+## Run frontend
+
+```bash
 yarn start
-Setup the Relayer Node
-Navigate to your relayer directory, install dependencies, and start the daemon.
+```
 
-Bash
+Open
+
+```
+http://localhost:3000
+```
+
+---
+
+## Run relayer
+
+Go to relayer folder
+
+Install deps
+
+```bash
 npm install express cors sqlite3 xrpl starknet dotenv
+```
+
+Create `.env`
+
+```
+XRPL_SECRET=
+STARKNET_PRIVATE_KEY=
+```
+
+Start
+
+```bash
 node relayer.js
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+```
 
-Roadmap
-[x] Launch XRPL -> Starknet 1:1 Minting Logic
+---
 
-[x] Deploy Intent-Based Routing Memo Architecture
+## Deployment
 
-[x] Integrate Pyth Oracle live feeds
+Deploy frontend with Vercel
 
-[ ] Integrate Controller by Cartridge for seamless, session-based wallet onboarding
+1. Connect repo
+2. Add env vars
+3. Deploy
 
-[ ] Automate Debridge / Withdraw Flow
+https://vercel.com/docs/deployments
 
-[ ] Activate DeFi Lab modules (Lending/Borrowing)
+---
 
-[ ] Implement Topper fiat on-ramp
+## Roadmap
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+- [x] XRPL → Starknet mint
+- [x] Memo intent router
+- [x] Pyth oracle
+- [ ] Cartridge controller
+- [ ] Withdraw flow
+- [ ] DeFi modules
+- [ ] Fiat on-ramp
 
-License
-Distributed under the Unlicense License. See LICENSE.txt for more information.
+---
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+## License
+
+Unlicense
+
+---
+
+[contributors-shield]: https://img.shields.io/github/contributors/Heretic-City/suite--
+[forks-shield]: https://img.shields.io/github/forks/Heretic-City/suite--
+[stars-shield]: https://img.shields.io/github/stars/Heretic-City/suite--
+[issues-shield]: https://img.shields.io/github/issues/Heretic-City/suite--
+[license-shield]: https://img.shields.io/github/license/Heretic-City/suite--
+
+[contributors-url]: https://github.com/Heretic-City/suite--/graphs/contributors
+[forks-url]: https://github.com/Heretic-City/suite--/network/members
+[stars-url]: https://github.com/Heretic-City/suite--/stargazers
+[issues-url]: https://github.com/Heretic-City/suite--/issues
+[license-url]: https://github.com/Heretic-City/suite--/blob/main/LICENSE

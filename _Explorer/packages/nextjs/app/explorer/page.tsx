@@ -212,14 +212,15 @@ export default function Explorer() {
 
     try {
       // ✅ EC2 API CALL ENABLED
-      const response = await fetch("http://54.82.191.189:3001/api/store-memo", {
+// ✅ SECURE NEXT.JS PROXY CALL
+      const response = await fetch("/api/store-memo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           starknetAddress: address, 
           xrpMemo: generatedTag,
-          riskLevel: selectedRisk, // Sending the intent payload
-          isLocked: isLocked,      // Sending the lock modifier
+          riskLevel: selectedRisk,
+          isLocked: isLocked,      
           timestamp: new Date().toISOString()
         })
       });

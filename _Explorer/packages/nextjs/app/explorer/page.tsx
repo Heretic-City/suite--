@@ -9,7 +9,7 @@ import deployedContracts from "~~/contracts/deployedContracts";
 // --- CONTRACT CONFIGS ---
 const HXT_DATA = configExternalContracts.mainnet?.[" Heretic Token"] || configExternalContracts.mainnet?.["Heretic Token"];
 const SXRP_DATA = configExternalContracts.mainnet?.[" Starknet XRP"] || configExternalContracts.mainnet?.["Starknet XRP"];
-
+const [isWithdrawing, setIsWithdrawing] = useState(false);
 const VESTING_DATA =
   deployedContracts.mainnet?.HXTVestingVault ||
   deployedContracts.mainnet?.[" HXTVestingVault"] ||
@@ -253,13 +253,43 @@ export default function Explorer() {
 
   const { sendAsync: executeWithdraw, isPending: isWithdrawing } = useSendTransaction({ calls: withdrawCalls });
   
-  const handleWithdraw = async () => {
+ const handleWithdraw = async () => {
     if (withdrawCalls.length === 0) return;
     try {
+      setIsWithdrawing(true); // Ensure you have a state for this if you don't already
+      
+      // 1. Execute the burn on Starknet
       const tx = await executeWithdraw();
-      alert("Burn initiated! Tx Hash: " + tx.transaction_hash);
-      setWithdrawAmount(""); setDestXrplAddress("");
-    } catch (e: any) { setWithdrawError(e.message || "Transaction rejected."); }
+      console.log("Burn initiated! Tx Hash: " + tx.transaction_hash);
+      
+      // 2. Wait for the transaction to be accepted on L2
+      await provider.waitForTransaction(tx.transaction_hash);
+
+      // 3. Ping the Relayer to release the XRP
+      const response = await fetch("/api/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          txHash: tx.transaction_hash,
+          destXrplAddress: destXrplAddress,
+          amount: withdrawAmount 
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Relayer failed to release funds.");
+      }
+
+      alert(`Success! XRP is on its way to ${destXrplAddress}`);
+      setWithdrawAmount(""); 
+      setDestXrplAddress("");
+
+    } catch (e: any) { 
+      setWithdrawError(e.message || "Withdrawal failed."); 
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   // --- RENDER DYNAMIC CARD CONTENT ---

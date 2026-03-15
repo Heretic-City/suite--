@@ -9,7 +9,7 @@ import deployedContracts from "~~/contracts/deployedContracts";
 // --- CONTRACT CONFIGS ---
 const HXT_DATA = configExternalContracts.mainnet?.[" Heretic Token"] || configExternalContracts.mainnet?.["Heretic Token"];
 const SXRP_DATA = configExternalContracts.mainnet?.[" Starknet XRP"] || configExternalContracts.mainnet?.["Starknet XRP"];
-const [isWithdrawing, setIsWithdrawing] = useState(false);
+
 const VESTING_DATA =
   deployedContracts.mainnet?.HXTVestingVault ||
   deployedContracts.mainnet?.[" HXTVestingVault"] ||
@@ -44,6 +44,11 @@ const MINIMAL_PYTH_ABI = [
 ];
 
 export default function Explorer() {
+  // --- WITHDRAW STATE ---
+const [withdrawAmount, setWithdrawAmount] = useState("");
+const [destXrplAddress, setDestXrplAddress] = useState("");
+const [withdrawError, setWithdrawError] = useState("");
+const [isWithdrawing, setIsWithdrawing] = useState(false);
   const { address, isConnected } = useAccount();
   const { provider } = useProvider();
 

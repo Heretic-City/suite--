@@ -44,13 +44,14 @@ const MINIMAL_PYTH_ABI = [
 ];
 
 export default function Explorer() {
-  // --- WITHDRAW STATE ---
-const [withdrawAmount, setWithdrawAmount] = useState("");
-const [destXrplAddress, setDestXrplAddress] = useState("");
-const [withdrawError, setWithdrawError] = useState("");
-const [isWithdrawing, setIsWithdrawing] = useState(false);
   const { address, isConnected } = useAccount();
   const { provider } = useProvider();
+
+  // --- WITHDRAW STATE ---
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [destXrplAddress, setDestXrplAddress] = useState("");
+  const [withdrawError, setWithdrawError] = useState("");
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // --- UI TAB STATE ---
   const [activeCard, setActiveCard] = useState<"SXRP" | "HXT" | null>(null);
@@ -135,11 +136,6 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [isRegisteringTag, setIsRegisteringTag] = useState(false);
   const [tagRegistered, setTagRegistered] = useState(false);
 
-  // --- WITHDRAW STATE ---
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [destXrplAddress, setDestXrplAddress] = useState("");
-  const [withdrawError, setWithdrawError] = useState("");
-
   useEffect(() => {
     const fetchMarketData = async () => {
       let xrpPrice = "0.00"; let vaultBal = "0"; let txs = [] as any[]; let hxtUsd = "0.00";
@@ -216,8 +212,7 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
     const generatedTag = Math.floor(100000000 + Math.random() * 900000000);
 
     try {
-      // ✅ EC2 API CALL ENABLED
-// ✅ SECURE NEXT.JS PROXY CALL
+      // ✅ SECURE NEXT.JS PROXY CALL
       const response = await fetch("/api/store-memo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -246,22 +241,29 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
   // --- WITHDRAW LOGIC ---
   const withdrawCalls = useMemo(() => {
     if (!destXrplAddress || !withdrawAmount || !SXRP_DATA?.address) return [];
+    
+    // Block withdrawals to the Vault to prevent over-collateralization
+    if (destXrplAddress === XRPL_VAULT_ADDRESS) {
+      setWithdrawError("You cannot withdraw to the Bridge Vault.");
+      return [];
+    }
+
     try {
       setWithdrawError("");
-      const amountUint256 = cairo.uint256(BigInt(Math.floor(Number(withdrawAmount) * 1e18)));
-      return [{ contractAddress: SXRP_DATA.address, entrypoint: "withdraw", calldata: [destXrplAddress, amountUint256.low, amountUint256.high] }];
+      const amountUint256 = cairo.uint256(BigInt(Math.floor(Number(withdrawAmount) * 1e6)));
+      return [{ contractAddress: SXRP_DATA.address, entrypoint: "withdraw", calldata: [0, amountUint256.low, amountUint256.high] }];
     } catch (err: any) {
       setWithdrawError("Invalid input parameters.");
       return [];
     }
   }, [destXrplAddress, withdrawAmount]);
 
-  const { sendAsync: executeWithdraw, isPending: isWithdrawing } = useSendTransaction({ calls: withdrawCalls });
+  const { sendAsync: executeWithdraw, isPending: txIsPending } = useSendTransaction({ calls: withdrawCalls });
   
- const handleWithdraw = async () => {
+  const handleWithdraw = async () => {
     if (withdrawCalls.length === 0) return;
     try {
-      setIsWithdrawing(true); // Ensure you have a state for this if you don't already
+      setIsWithdrawing(true); 
       
       // 1. Execute the burn on Starknet
       const tx = await executeWithdraw();
@@ -270,7 +272,7 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
       // 2. Wait for the transaction to be accepted on L2
       await provider.waitForTransaction(tx.transaction_hash);
 
-      // 3. Ping the Relayer to release the XRP
+     // 3. Ping the Relayer to release the XRP
       const response = await fetch("/api/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -282,8 +284,16 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Relayer failed to release funds.");
+        let errMessage = "Relayer failed to release funds.";
+        try {
+          // Try to read the JSON error from the EC2 server
+          const errData = await response.json();
+          errMessage = errData.error || errMessage;
+        } catch (parseErr) {
+          // If it's a 405 or 500 HTML page, catch it gracefully
+          errMessage = `Server Error: ${response.status} ${response.statusText}`;
+        }
+        throw new Error(errMessage);
       }
 
       alert(`Success! XRP is on its way to ${destXrplAddress}`);
@@ -432,8 +442,8 @@ const [isWithdrawing, setIsWithdrawing] = useState(false);
                       Connect Wallet to Burn
                     </button>
                   ) : (
-                    <button className={`btn btn-error btn-sm w-full mt-2 !text-white font-bold ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={!withdrawAmount || !destXrplAddress || !!withdrawError}>
-                      {isWithdrawing ? "Burning..." : "Confirm Burn"}
+                    <button className={`btn btn-error btn-sm w-full mt-2 !text-white font-bold ${isWithdrawing || txIsPending ? "loading" : ""}`} onClick={handleWithdraw} disabled={!withdrawAmount || !destXrplAddress || !!withdrawError}>
+                      {isWithdrawing || txIsPending ? "Burning..." : "Confirm Burn"}
                     </button>
                   )}
                 </div>

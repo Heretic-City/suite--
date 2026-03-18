@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useAccount, useConnect, useReadContract, useProvider, useSendTransaction } from "@starknet-react/core";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useAccount, useReadContract, useProvider } from "@starknet-react/core";
 import { cairo } from "starknet";
 import configExternalContracts from "~~/contracts/configExternalContracts";
 import deployedContracts from "~~/contracts/deployedContracts";
 
-// --- CONTRACT CONFIGS ---
+// --- CONTRACT CONFIGS & CONSTANTS ---
 const HXT_DATA = configExternalContracts.mainnet?.[" Heretic Token"] || configExternalContracts.mainnet?.["Heretic Token"];
 const SXRP_DATA = configExternalContracts.mainnet?.[" Starknet XRP"] || configExternalContracts.mainnet?.["Starknet XRP"];
 
@@ -19,8 +19,6 @@ const VESTING_DATA =
 const XRPL_VAULT_ADDRESS = "rakJBTzLuhFBxFwogaqj73Q9anqAdjy8U7";
 const PYTH_STARKNET_ADDRESS = "0x028c85e2fb2f9c37b27519ea4bfdf599f52f11815147816f5c5b967ed43ff455";
 const XRP_PRICE_FEED_ID = "0xec5d399846a9209f3fe5881d70aae9268c94339ff9817e8d18ff19fa05eea1c8";
-const PRICE_UPDATED_SELECTOR = "0x1cdf72260ed495c59be104c55f648f51c99904fe931ff121784f30766184c1c";
-
 const HXT_TOKEN_ADDR = HXT_DATA?.address;
 
 const MINIMAL_PYTH_ABI = [
@@ -43,15 +41,257 @@ const MINIMAL_PYTH_ABI = [
   }
 ];
 
-export default function Explorer() {
-  const { address, isConnected } = useAccount();
+// --- GLOBAL MATH HELPERS ---
+const formatBalance = (data: any, decimals: number = 2) => {
+  if (!data) return "0.00";
+  try {
+    let valBigInt = 0n;
+    if (typeof data === 'bigint') valBigInt = data;
+    else if (typeof data === 'object') {
+      if ('low' in data && 'high' in data) valBigInt = BigInt(data.low) + (BigInt(data.high) << 128n);
+      else if (Array.isArray(data) && data.length > 0) valBigInt = BigInt(data[0]);
+      else if ('res' in data) valBigInt = BigInt(data.res);
+      else valBigInt = BigInt(data.toString());
+    } else valBigInt = data;
+    return (Number(valBigInt) / 10**18).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  } catch { return "0.00"; }
+};
+
+const getHoldingsValue = (balance: any, price: string) => {
+  if (!balance || price === "0.00") return "$0.00";
+  try {
+    return `$${(parseFloat(formatBalance(balance, 6).replace(/,/g, '')) * parseFloat(price)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } catch { return "$0.00"; }
+};
+
+// --- ISOLATED MICRO-COMPONENTS ---
+const LiveBalance = ({ contract, address }: { contract: any, address?: string }) => {
+  const { data, isFetching } = useReadContract({
+    functionName: "balance_of", abi: contract?.abi, address: contract?.address,
+    args: address ? [address] : [], watch: true, enabled: !!address,
+  });
+  if (isFetching && !data) return <span className="loading loading-dots"></span>;
+  return <>{formatBalance(data)}</>;
+};
+
+const LiveValue = ({ contract, address, price }: { contract: any, address?: string, price: string }) => {
+  const { data } = useReadContract({
+    functionName: "balance_of", abi: contract?.abi, address: contract?.address,
+    args: address ? [address] : [], watch: true, enabled: !!address,
+  });
+  return <>{getHoldingsValue(data, price)}</>;
+};
+
+const LiveSupply = ({ contract }: { contract: any }) => {
+  const { data, isFetching, error } = useReadContract({
+    functionName: "total_supply", abi: contract?.abi, address: contract?.address,
+    args: [], watch: true,
+  });
+  if (isFetching && !data) return <span className="loading loading-spinner loading-sm"></span>;
+  if (error) return <span className="text-error text-sm">Err</span>;
+  return <>{formatBalance(data)}</>;
+};
+
+const LivePythPrice = () => {
+  const { data, isFetching } = useReadContract({
+    functionName: "get_price_unsafe", abi: MINIMAL_PYTH_ABI, address: PYTH_STARKNET_ADDRESS,
+    args: [XRP_PRICE_FEED_ID], watch: true,
+  });
+  if (isFetching && !data) return <>...</>;
+  const price = (Number((data as any)?.price || 0) * Math.pow(10, (data as any)?.expo || 0)).toFixed(4);
+  return <>${price}</>;
+};
+
+const LiveVestedAmount = () => {
+  const [currentTimestamp, setCurrentTimestamp] = useState(Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTimestamp(Math.floor(Date.now() / 1000)), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const { data, isFetching } = useReadContract({
+    functionName: "vested_amount", abi: VESTING_DATA?.abi, address: VESTING_DATA?.address,
+    args: [HXT_TOKEN_ADDR, currentTimestamp], watch: true,
+    enabled: !!VESTING_DATA?.address && !!HXT_TOKEN_ADDR,
+  });
+  if (isFetching && !data) return <span className="loading loading-dots"></span>;
+  return <>{formatBalance(data)}</>;
+};
+
+
+// 🚨 THE NATIVE DOM OVERRIDE FIX 🚨
+const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
+  const { account, isConnected } = useAccount();
   const { provider } = useProvider();
 
-  // --- WITHDRAW STATE ---
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [destXrplAddress, setDestXrplAddress] = useState("");
   const [withdrawError, setWithdrawError] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // 1. Create Refs to target the actual HTML DOM elements
+  const addrRef = useRef<HTMLInputElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+
+  // 2. The Native Override - Bypasses React to physically block event hijacking
+  useEffect(() => {
+    const addrEl = addrRef.current;
+    const amountEl = amountRef.current;
+
+    const stopHijack = (e: Event) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation(); // Kills Scaffold-ETH/DaisyUI listeners instantly
+    };
+
+    const enforceFocus = (e: Event) => {
+      stopHijack(e);
+      (e.target as HTMLElement).focus(); // Force the mobile keyboard to stay open
+    };
+
+    if (addrEl) {
+      addrEl.addEventListener('mousedown', stopHijack);
+      addrEl.addEventListener('touchstart', stopHijack, { passive: false });
+      addrEl.addEventListener('touchend', enforceFocus, { passive: false });
+      addrEl.addEventListener('click', enforceFocus);
+    }
+
+    if (amountEl) {
+      amountEl.addEventListener('mousedown', stopHijack);
+      amountEl.addEventListener('touchstart', stopHijack, { passive: false });
+      amountEl.addEventListener('touchend', enforceFocus, { passive: false });
+      amountEl.addEventListener('click', enforceFocus);
+    }
+
+    return () => {
+      if (addrEl) {
+        addrEl.removeEventListener('mousedown', stopHijack);
+        addrEl.removeEventListener('touchstart', stopHijack);
+        addrEl.removeEventListener('touchend', enforceFocus);
+        addrEl.removeEventListener('click', enforceFocus);
+      }
+      if (amountEl) {
+        amountEl.removeEventListener('mousedown', stopHijack);
+        amountEl.removeEventListener('touchstart', stopHijack);
+        amountEl.removeEventListener('touchend', enforceFocus);
+        amountEl.removeEventListener('click', enforceFocus);
+      }
+    };
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setWithdrawAmount("");
+    setDestXrplAddress("");
+    setWithdrawError("");
+    setIsWithdrawing(false);
+  }, []);
+
+  const handleWithdraw = useCallback(async () => {
+    setWithdrawError("");
+    const destClean = destXrplAddress.trim();
+    const amountClean = withdrawAmount.trim();
+
+    if (destClean === XRPL_VAULT_ADDRESS) return setWithdrawError("You cannot withdraw to the Bridge Vault.");
+    if (!destClean || !amountClean || !SXRP_DATA?.address) return setWithdrawError("Please enter both an amount and a destination address.");
+    if (!account) return setWithdrawError("Wallet not connected.");
+
+    try {
+      setIsWithdrawing(true);
+      const amountUint256 = cairo.uint256(BigInt(Math.floor(Number(amountClean) * 1e18)));
+      const finalCalls = [{ 
+        contractAddress: SXRP_DATA.address, 
+        entrypoint: "withdraw", 
+        calldata: [0, amountUint256.low, amountUint256.high] 
+      }];
+
+      const tx = await account.execute(finalCalls);
+      await provider.waitForTransaction(tx.transaction_hash);
+
+      const response = await fetch("/api/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash: tx.transaction_hash, destXrplAddress: destClean, amount: amountClean }),
+      });
+
+      if (!response.ok) throw new Error("Relayer failed");
+      alert(`Success! XRP is on its way to ${destClean}`);
+      handleReset();
+    } catch (e: any) {
+      setWithdrawError(e.message || "Withdrawal failed.");
+    } finally {
+      setIsWithdrawing(false);
+    }
+  }, [withdrawAmount, destXrplAddress, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset]);
+
+  return (
+    <div className="space-y-3 relative z-50">
+      <div className="form-control">
+        <label className="label py-1">
+          <span className="label-text text-xs font-semibold">Dest. XRPL Address</span>
+        </label>
+        <input
+          ref={addrRef}
+          type="text"
+          inputMode="text"
+          autoComplete="off"
+          placeholder="r..."
+          className={`input input-sm input-bordered w-full ${withdrawError ? "input-error" : ""}`}
+          value={destXrplAddress}
+          onChange={(e) => setDestXrplAddress(e.target.value)}
+          style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
+        />
+      </div>
+
+      <div className="form-control">
+        <label className="label py-1">
+          <span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span>
+        </label>
+        <input
+          ref={amountRef}
+          type="number"
+          step="0.01"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="0.00"
+          className="input input-sm input-bordered w-full"
+          value={withdrawAmount}
+          onChange={(e) => setWithdrawAmount(e.target.value)}
+          style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
+        />
+      </div>
+
+      {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
+
+      {!isConnected ? (
+        <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>
+          Connect Wallet to Burn
+        </button>
+      ) : (
+        <div className="flex gap-2 mt-2">
+          <button
+            className={`btn btn-error btn-sm flex-1 !text-white font-bold ${isWithdrawing ? "loading" : ""}`}
+            onClick={handleWithdraw}
+            disabled={isWithdrawing}
+          >
+            {isWithdrawing ? "Burning..." : "Confirm Burn"}
+          </button>
+          <button
+            className="btn btn-outline border-base-content/20 text-base-content/70 hover:bg-base-content/10 btn-sm btn-square"
+            onClick={handleReset}
+            disabled={isWithdrawing}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+WithdrawalForm.displayName = "WithdrawalForm";
+
+// --- MAIN EXPLORER PAGE ---
+export default function Explorer() {
+  const { address, isConnected } = useAccount();
 
   // --- UI TAB STATE ---
   const [activeCard, setActiveCard] = useState<"SXRP" | "HXT" | null>(null);
@@ -63,66 +303,6 @@ export default function Explorer() {
   // --- INTENT-BASED BRIDGING STATE ---
   const [selectedRisk, setSelectedRisk] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState<boolean>(false);
-
-  const [currentTimestamp, setCurrentTimestamp] = useState(Math.floor(Date.now() / 1000));
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTimestamp(Math.floor(Date.now() / 1000)), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // --- STARKNET DATA ---
-  const { data: hxtData, isFetching: hxtLoading } = useReadContract({
-    functionName: "balance_of",
-    abi: HXT_DATA?.abi,
-    address: HXT_DATA?.address,
-    args: address ? [address] : [],
-    watch: true,
-    enabled: !!address,
-  });
-
-  const { data: sxrpData, isFetching: sxrpLoading } = useReadContract({
-    functionName: "balance_of",
-    abi: SXRP_DATA?.abi,
-    address: SXRP_DATA?.address,
-    args: address ? [address] : [],
-    watch: true,
-    enabled: !!address,
-  });
-
-  const { data: sxrpTotalSupply, isFetching: sxrpSupplyLoading, error: sxrpSupplyError } = useReadContract({
-    functionName: "total_supply",
-    abi: SXRP_DATA?.abi,
-    address: SXRP_DATA?.address,
-    args: [],
-    watch: true,
-  });
-
-  const { data: pythOnChainData, isFetching: pythOnChainLoading } = useReadContract({
-    functionName: "get_price_unsafe",
-    abi: MINIMAL_PYTH_ABI,
-    address: PYTH_STARKNET_ADDRESS,
-    args: [XRP_PRICE_FEED_ID],
-    watch: true,
-  });
-
-  const { data: vestedAmount, isFetching: vestedLoading } = useReadContract({
-    functionName: "vested_amount",
-    abi: VESTING_DATA?.abi,
-    address: VESTING_DATA?.address,
-    args: [HXT_TOKEN_ADDR, currentTimestamp],
-    watch: true,
-    enabled: !!VESTING_DATA?.address && !!HXT_TOKEN_ADDR,
-  });
-
-  const { data: vaultRawBalance, isFetching: vaultBalanceLoading } = useReadContract({
-    functionName: "balance_of",
-    abi: HXT_DATA?.abi,
-    address: HXT_DATA?.address,
-    args: [VESTING_DATA?.address],
-    watch: true,
-    enabled: !!VESTING_DATA?.address,
-  });
 
   // --- EXTERNAL DATA ---
   const [marketData, setMarketData] = useState({
@@ -170,36 +350,12 @@ export default function Explorer() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- HELPERS ---
-  const formatBalance = (data: any, decimals: number = 2) => {
-    if (!data) return "0.00";
-    try {
-      let valBigInt = 0n;
-      if (typeof data === 'bigint') valBigInt = data;
-      else if (typeof data === 'object') {
-        if ('low' in data && 'high' in data) valBigInt = BigInt(data.low) + (BigInt(data.high) << 128n);
-        else if (Array.isArray(data) && data.length > 0) valBigInt = BigInt(data[0]);
-        else if ('res' in data) valBigInt = BigInt(data.res);
-        else valBigInt = BigInt(data.toString());
-      } else valBigInt = BigInt(data);
-      return (Number(valBigInt) / 10**18).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    } catch { return "0.00"; }
-  };
-
-  const getHoldingsValue = (balance: any, price: string) => {
-    if (!balance || price === "0.00") return "$0.00";
-    try {
-      return `$${(parseFloat(formatBalance(balance, 6).replace(/,/g, '')) * parseFloat(price)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } catch { return "$0.00"; }
-  };
-
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(type);
     setTimeout(() => setCopiedText(""), 2000);
   };
 
-  // --- DEPOSIT DB REGISTRATION LOGIC ---
   const handleRegisterTag = async () => {
     if (!address) {
       alert("Please connect your Starknet wallet first.");
@@ -207,12 +363,9 @@ export default function Explorer() {
     }
     
     setIsRegisteringTag(true);
-
-    // Generate a 9-digit random number
     const generatedTag = Math.floor(100000000 + Math.random() * 900000000);
 
     try {
-      // ✅ SECURE NEXT.JS PROXY CALL
       const response = await fetch("/api/store-memo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -227,7 +380,6 @@ export default function Explorer() {
 
       if (!response.ok) throw new Error("Failed to save to database");
       
-      // Update UI on success
       setDestTag(generatedTag);
       setTagRegistered(true);
     } catch (error) {
@@ -238,84 +390,18 @@ export default function Explorer() {
     }
   };
 
-  // --- WITHDRAW LOGIC ---
-  const withdrawCalls = useMemo(() => {
-    if (!destXrplAddress || !withdrawAmount || !SXRP_DATA?.address) return [];
-    
-    // Block withdrawals to the Vault to prevent over-collateralization
-    if (destXrplAddress === XRPL_VAULT_ADDRESS) {
-      setWithdrawError("You cannot withdraw to the Bridge Vault.");
-      return [];
-    }
-
-    try {
-      setWithdrawError("");
-      const amountUint256 = cairo.uint256(BigInt(Math.floor(Number(withdrawAmount) * 1e6)));
-      return [{ contractAddress: SXRP_DATA.address, entrypoint: "withdraw", calldata: [0, amountUint256.low, amountUint256.high] }];
-    } catch (err: any) {
-      setWithdrawError("Invalid input parameters.");
-      return [];
-    }
-  }, [destXrplAddress, withdrawAmount]);
-
-  const { sendAsync: executeWithdraw, isPending: txIsPending } = useSendTransaction({ calls: withdrawCalls });
-  
-  const handleWithdraw = async () => {
-    if (withdrawCalls.length === 0) return;
-    try {
-      setIsWithdrawing(true); 
-      
-      // 1. Execute the burn on Starknet
-      const tx = await executeWithdraw();
-      console.log("Burn initiated! Tx Hash: " + tx.transaction_hash);
-      
-      // 2. Wait for the transaction to be accepted on L2
-      await provider.waitForTransaction(tx.transaction_hash);
-
-     // 3. Ping the Relayer to release the XRP
-      const response = await fetch("/api/withdraw", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          txHash: tx.transaction_hash,
-          destXrplAddress: destXrplAddress,
-          amount: withdrawAmount 
-        })
-      });
-
-      if (!response.ok) {
-        let errMessage = "Relayer failed to release funds.";
-        try {
-          // Try to read the JSON error from the EC2 server
-          const errData = await response.json();
-          errMessage = errData.error || errMessage;
-        } catch (parseErr) {
-          // If it's a 405 or 500 HTML page, catch it gracefully
-          errMessage = `Server Error: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(errMessage);
-      }
-
-      alert(`Success! XRP is on its way to ${destXrplAddress}`);
-      setWithdrawAmount(""); 
-      setDestXrplAddress("");
-
-    } catch (e: any) { 
-      setWithdrawError(e.message || "Withdrawal failed."); 
-    } finally {
-      setIsWithdrawing(false);
-    }
-  };
-
-  // --- RENDER DYNAMIC CARD CONTENT ---
   const renderSxrpContent = () => {
     if (activeCard !== "SXRP") return (
       <div className="text-center transition-all duration-300">
-        <p className="text-4xl font-mono font-bold text-base-content">{sxrpLoading ? <span className="loading loading-dots"></span> : formatBalance(sxrpData)}</p>
+        <p className="text-4xl font-mono font-bold text-base-content">
+          <LiveBalance contract={SXRP_DATA} address={address} />
+        </p>
         <div className="badge badge-secondary badge-outline mt-2 text-xs flex gap-2 mx-auto">
           <span>${marketData.sxrpPriceUsd} / sXRP</span><span className="opacity-50">(Pyth Oracle)</span>
         </div>
-        <p className="text-sm opacity-70 mt-4 font-semibold">Value: {getHoldingsValue(sxrpData, marketData.sxrpPriceUsd)}</p>
+        <p className="text-sm opacity-70 mt-4 font-semibold">
+          Value: <LiveValue contract={SXRP_DATA} address={address} price={marketData.sxrpPriceUsd} />
+        </p>
       </div>
     );
 
@@ -341,7 +427,6 @@ export default function Explorer() {
                     <div className="bg-base-100 p-5 rounded-lg border border-secondary text-center shadow-[0_0_15px_rgba(var(--color-secondary),0.1)]">
                       <p className="text-sm font-bold mb-4">Step 1: Configure Route & Link Address</p>
                       
-                      {/* --- NEW ASSET SPREAD INTENT UI --- */}
                       <div className="mb-6 text-left">
                         <p className="text-[11px] font-bold mb-2 uppercase opacity-80">Select Target Asset Spread:</p>
                         <div className="grid grid-cols-2 gap-2 mb-3">
@@ -382,7 +467,6 @@ export default function Explorer() {
                         </div>
                       </div>
                       
-                      {/* CONDITIONAL BUTTON RENDER */}
                       {!isConnected ? (
                         <button className="btn btn-secondary btn-sm w-full opacity-50 cursor-not-allowed !text-white" disabled>
                           Connect Wallet to Configure
@@ -426,27 +510,10 @@ export default function Explorer() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="form-control">
-                    <label className="label py-1"><span className="label-text text-xs font-semibold">Dest. XRPL Address</span></label>
-                    <input type="text" placeholder="r..." className={`input input-sm input-bordered w-full ${withdrawError ? 'input-error' : ''}`} value={destXrplAddress} onChange={(e) => setDestXrplAddress(e.target.value)} disabled={!isConnected} />
-                  </div>
-                  <div className="form-control">
-                    <label className="label py-1"><span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span></label>
-                    <input type="number" step="0.01" placeholder="0.00" className="input input-sm input-bordered w-full" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} disabled={!isConnected} />
-                  </div>
-                  {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
-                  
-                  {!isConnected ? (
-                    <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>
-                      Connect Wallet to Burn
-                    </button>
-                  ) : (
-                    <button className={`btn btn-error btn-sm w-full mt-2 !text-white font-bold ${isWithdrawing || txIsPending ? "loading" : ""}`} onClick={handleWithdraw} disabled={!withdrawAmount || !destXrplAddress || !!withdrawError}>
-                      {isWithdrawing || txIsPending ? "Burning..." : "Confirm Burn"}
-                    </button>
-                  )}
-                </div>
+                <WithdrawalForm 
+                  SXRP_DATA={SXRP_DATA} 
+                  XRPL_VAULT_ADDRESS={XRPL_VAULT_ADDRESS} 
+                />
               )}
             </div>
           </div>
@@ -474,9 +541,13 @@ export default function Explorer() {
   const renderHxtContent = () => {
     if (activeCard !== "HXT") return (
       <div className="text-center transition-all duration-300">
-        <p className="text-4xl font-mono font-bold text-base-content">{hxtLoading ? <span className="loading loading-dots"></span> : formatBalance(hxtData)}</p>
+        <p className="text-4xl font-mono font-bold text-base-content">
+          <LiveBalance contract={HXT_DATA} address={address} />
+        </p>
         <div className="badge badge-outline mt-2 text-xs">${marketData.hxtPriceUsd} / HXT</div>
-        <p className="text-sm opacity-70 mt-4 font-semibold">Value: {getHoldingsValue(hxtData, marketData.hxtPriceUsd)}</p>
+        <p className="text-sm opacity-70 mt-4 font-semibold">
+          Value: <LiveValue contract={HXT_DATA} address={address} price={marketData.hxtPriceUsd} />
+        </p>
       </div>
     );
 
@@ -554,7 +625,7 @@ export default function Explorer() {
               <div className="flex-1 flex flex-col items-center">
                 <p className="text-sm opacity-70 mb-1">Supply (Starknet)</p>
                 <div className="text-3xl font-mono font-bold text-secondary">
-                  {sxrpSupplyLoading ? <span className="loading loading-spinner loading-sm"></span> : sxrpSupplyError ? <span className="text-error text-sm">Err</span> : formatBalance(sxrpTotalSupply)}
+                  <LiveSupply contract={SXRP_DATA} />
                 </div>
               </div>
             </div>
@@ -567,7 +638,7 @@ export default function Explorer() {
             <div className="flex justify-between items-center border-t border-base-content/10 pt-4 mt-4">
                <div>
                   <p className="text-[10px] opacity-60 uppercase font-bold">On-Chain (Starknet)</p>
-                  <p className="text-sm font-mono text-info">{pythOnChainLoading ? "..." : `$${(Number(pythOnChainData?.price || 0) * Math.pow(10, pythOnChainData?.expo || 0)).toFixed(4)}`}</p>
+                  <p className="text-sm font-mono text-info"><LivePythPrice /></p>
                </div>
                <button onClick={() => (document.getElementById('history_modal') as any).showModal()} className="btn btn-outline btn-xs border-base-content/20 text-base-content/70 hover:bg-base-content/10">History</button>
             </div>
@@ -602,11 +673,15 @@ export default function Explorer() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="bg-base-100 p-5 rounded-xl border border-base-content/10 text-center shadow-sm">
               <p className="text-xs uppercase opacity-60 font-bold mb-2">Total Locked (HXT)</p>
-              <p className="text-2xl font-mono font-bold text-base-content">{vaultBalanceLoading ? <span className="loading loading-dots"></span> : formatBalance(vaultRawBalance)}</p>
+              <p className="text-2xl font-mono font-bold text-base-content">
+                <LiveBalance contract={HXT_DATA} address={VESTING_DATA?.address} />
+              </p>
             </div>
             <div className="bg-base-100 p-5 rounded-xl border border-base-content/10 text-center shadow-sm">
               <p className="text-xs uppercase opacity-60 font-bold mb-2">Vested to Date</p>
-              <p className="text-2xl font-mono font-bold text-success">{vestedLoading ? <span className="loading loading-dots"></span> : formatBalance(vestedAmount)}</p>
+              <p className="text-2xl font-mono font-bold text-success">
+                <LiveVestedAmount />
+              </p>
             </div>
             <div className="bg-base-100 p-5 rounded-xl border border-base-content/10 text-center shadow-sm flex flex-col justify-center items-center">
               <p className="text-xs uppercase opacity-60 font-bold mb-2">Contract Address</p>

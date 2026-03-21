@@ -227,7 +227,7 @@ https://vercel.com/docs/deployments
 - [x] XRPL → Starknet mint
 - [x] Memo intent router
 - [x] Pyth oracle
-- [ ] Cartridge controller
+- [x] Cartridge controller
 - [ ] Withdraw flow
 - [ ] DeFi modules
 - [ ] Fiat on-ramp

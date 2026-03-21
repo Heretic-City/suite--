@@ -118,7 +118,7 @@ const LiveVestedAmount = () => {
 };
 
 
-// 🚨 THE NATIVE DOM OVERRIDE FIX 🚨
+// 🚨 THE NATIVE DOM OVERRIDE + NUMERIC DESTINATION TAG FIX 🚨
 const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
   const { account, isConnected } = useAccount();
   const { provider } = useProvider();
@@ -128,58 +128,88 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
   const [withdrawError, setWithdrawError] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
+  // --- THE NUMERIC TAG STATE ---
+  const [memoChars, setMemoChars] = useState<string[]>(Array(10).fill(""));
+  // 🚨 UI FIX: Strictly numbers only!
+  const allowedChars = "0123456789";
+
   // 1. Create Refs to target the actual HTML DOM elements
   const addrRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const memoRefs = useRef<HTMLInputElement[]>([]);
 
   // 2. The Native Override - Bypasses React to physically block event hijacking
   useEffect(() => {
-    const addrEl = addrRef.current;
-    const amountEl = amountRef.current;
+    const elements = [addrRef.current, amountRef.current, ...memoRefs.current].filter(Boolean) as HTMLInputElement[];
 
     const stopHijack = (e: Event) => {
       e.stopPropagation();
-      e.stopImmediatePropagation(); // Kills Scaffold-ETH/DaisyUI listeners instantly
+      e.stopImmediatePropagation(); 
     };
 
     const enforceFocus = (e: Event) => {
       stopHijack(e);
-      (e.target as HTMLElement).focus(); // Force the mobile keyboard to stay open
+      (e.target as HTMLElement).focus(); 
     };
 
-    if (addrEl) {
-      addrEl.addEventListener('mousedown', stopHijack);
-      addrEl.addEventListener('touchstart', stopHijack, { passive: false });
-      addrEl.addEventListener('touchend', enforceFocus, { passive: false });
-      addrEl.addEventListener('click', enforceFocus);
-    }
-
-    if (amountEl) {
-      amountEl.addEventListener('mousedown', stopHijack);
-      amountEl.addEventListener('touchstart', stopHijack, { passive: false });
-      amountEl.addEventListener('touchend', enforceFocus, { passive: false });
-      amountEl.addEventListener('click', enforceFocus);
-    }
+    elements.forEach(el => {
+      el.addEventListener('mousedown', stopHijack);
+      el.addEventListener('touchstart', stopHijack, { passive: false });
+      el.addEventListener('touchend', enforceFocus, { passive: false });
+      el.addEventListener('click', enforceFocus);
+    });
 
     return () => {
-      if (addrEl) {
-        addrEl.removeEventListener('mousedown', stopHijack);
-        addrEl.removeEventListener('touchstart', stopHijack);
-        addrEl.removeEventListener('touchend', enforceFocus);
-        addrEl.removeEventListener('click', enforceFocus);
-      }
-      if (amountEl) {
-        amountEl.removeEventListener('mousedown', stopHijack);
-        amountEl.removeEventListener('touchstart', stopHijack);
-        amountEl.removeEventListener('touchend', enforceFocus);
-        amountEl.removeEventListener('click', enforceFocus);
-      }
+      elements.forEach(el => {
+        el.removeEventListener('mousedown', stopHijack);
+        el.removeEventListener('touchstart', stopHijack);
+        el.removeEventListener('touchend', enforceFocus);
+        el.removeEventListener('click', enforceFocus);
+      });
     };
-  }, []);
+  }, []); 
+
+  // --- MEMO LOGIC: Paste, Type, Delete ---
+  const handleMemoPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    
+    // 🚨 Filter out everything except numbers
+    const validChars = pastedData.split('').filter(c => allowedChars.includes(c)).slice(0, 10);
+    
+    const newMemo = [...memoChars];
+    for (let i = 0; i < 10; i++) {
+      newMemo[i] = validChars[i] || "";
+    }
+    setMemoChars(newMemo);
+
+    const nextIndex = Math.min(validChars.length, 9);
+    memoRefs.current[nextIndex]?.focus();
+  };
+
+  const handleMemoChange = (index: number, val: string) => {
+    const char = val.slice(-1); 
+    if (char && !allowedChars.includes(char)) return; 
+
+    const newMemo = [...memoChars];
+    newMemo[index] = char || "";
+    setMemoChars(newMemo);
+
+    if (char && index < 9) {
+      memoRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleMemoKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !memoChars[index] && index > 0) {
+      memoRefs.current[index - 1]?.focus();
+    }
+  };
 
   const handleReset = useCallback(() => {
     setWithdrawAmount("");
     setDestXrplAddress("");
+    setMemoChars(Array(10).fill(""));
     setWithdrawError("");
     setIsWithdrawing(false);
   }, []);
@@ -188,9 +218,16 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
     setWithdrawError("");
     const destClean = destXrplAddress.trim();
     const amountClean = withdrawAmount.trim();
+    const finalTag = memoChars.join("").trim(); 
 
     if (destClean === XRPL_VAULT_ADDRESS) return setWithdrawError("You cannot withdraw to the Bridge Vault.");
-    if (!destClean || !amountClean || !SXRP_DATA?.address) return setWithdrawError("Please enter both an amount and a destination address.");
+    if (!destClean || !amountClean || !SXRP_DATA?.address) return setWithdrawError("Please enter an amount and destination.");
+    
+    // XRPL Destination Tags cannot exceed the 32-bit max integer
+    if (finalTag && Number(finalTag) > 4294967295) {
+      return setWithdrawError("Destination Tag is too large (Max: 4294967295).");
+    }
+
     if (!account) return setWithdrawError("Wallet not connected.");
 
     try {
@@ -208,7 +245,12 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
       const response = await fetch("/api/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txHash: tx.transaction_hash, destXrplAddress: destClean, amount: amountClean }),
+        body: JSON.stringify({ 
+            txHash: tx.transaction_hash, 
+            destXrplAddress: destClean, 
+            amount: amountClean,
+            destinationTag: finalTag || null // Send the tag to the relayer
+        }),
       });
 
       if (!response.ok) throw new Error("Relayer failed");
@@ -219,10 +261,11 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
     } finally {
       setIsWithdrawing(false);
     }
-  }, [withdrawAmount, destXrplAddress, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset]);
+  }, [withdrawAmount, destXrplAddress, memoChars, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset]);
 
   return (
-    <div className="space-y-3 relative z-50">
+    <div className="space-y-4 relative z-50">
+      
       <div className="form-control">
         <label className="label py-1">
           <span className="label-text text-xs font-semibold">Dest. XRPL Address</span>
@@ -238,6 +281,34 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
           onChange={(e) => setDestXrplAddress(e.target.value)}
           style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
         />
+      </div>
+
+      {/* WHEEL OF FORTUNE TAG */}
+      <div className="form-control">
+        <label className="label py-1 flex justify-between">
+          <span className="label-text text-xs font-semibold">Destination Tag (Optional)</span>
+          <span className="label-text text-[10px] opacity-50">{memoChars.join("").length}/10</span>
+        </label>
+        <div className="flex justify-between gap-1 w-full" onPaste={handleMemoPaste}>
+          {memoChars.map((char, index) => (
+            <input
+              key={`memo-slot-${index}`}
+              ref={(el) => {
+                if (el) memoRefs.current[index] = el;
+              }}
+              type="text"
+              inputMode="numeric" // 🚨 Forces number pad on mobile
+              pattern="[0-9]*"
+              maxLength={1}
+              autoComplete="off"
+              className="w-[9%] aspect-[2/3] text-center text-lg font-bold border border-base-content/20 bg-base-100 rounded shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] focus:border-primary focus:ring-1 focus:ring-primary transition-all p-0"
+              value={char}
+              onChange={(e) => handleMemoChange(index, e.target.value)}
+              onKeyDown={(e) => handleMemoKeyDown(index, e)}
+              style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="form-control">

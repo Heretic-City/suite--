@@ -119,7 +119,7 @@ const LiveVestedAmount = () => {
 
 
 // 🚨 THE NATIVE DOM OVERRIDE + NUMERIC DESTINATION TAG FIX 🚨
-const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
+const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow, offChainPrice }: any) => {
   const { account, isConnected } = useAccount();
   const { provider } = useProvider();
 
@@ -130,23 +130,18 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
 
   // --- THE NUMERIC TAG STATE ---
   const [memoChars, setMemoChars] = useState<string[]>(Array(10).fill(""));
-  // 🚨 UI FIX: Strictly numbers only!
   const allowedChars = "0123456789";
 
-  // 1. Create Refs to target the actual HTML DOM elements
   const addrRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const memoRefs = useRef<HTMLInputElement[]>([]);
 
-  // 2. The Native Override - Bypasses React to physically block event hijacking
   useEffect(() => {
     const elements = [addrRef.current, amountRef.current, ...memoRefs.current].filter(Boolean) as HTMLInputElement[];
-
     const stopHijack = (e: Event) => {
       e.stopPropagation();
       e.stopImmediatePropagation(); 
     };
-
     const enforceFocus = (e: Event) => {
       stopHijack(e);
       (e.target as HTMLElement).focus(); 
@@ -169,20 +164,15 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
     };
   }, []); 
 
-  // --- MEMO LOGIC: Paste, Type, Delete ---
   const handleMemoPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text');
-    
-    // 🚨 Filter out everything except numbers
     const validChars = pastedData.split('').filter(c => allowedChars.includes(c)).slice(0, 10);
-    
     const newMemo = [...memoChars];
     for (let i = 0; i < 10; i++) {
       newMemo[i] = validChars[i] || "";
     }
     setMemoChars(newMemo);
-
     const nextIndex = Math.min(validChars.length, 9);
     memoRefs.current[nextIndex]?.focus();
   };
@@ -190,11 +180,9 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
   const handleMemoChange = (index: number, val: string) => {
     const char = val.slice(-1); 
     if (char && !allowedChars.includes(char)) return; 
-
     const newMemo = [...memoChars];
     newMemo[index] = char || "";
     setMemoChars(newMemo);
-
     if (char && index < 9) {
       memoRefs.current[index + 1]?.focus();
     }
@@ -222,8 +210,6 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
 
     if (destClean === XRPL_VAULT_ADDRESS) return setWithdrawError("You cannot withdraw to the Bridge Vault.");
     if (!destClean || !amountClean || !SXRP_DATA?.address) return setWithdrawError("Please enter an amount and destination.");
-    
-    // XRPL Destination Tags cannot exceed the 32-bit max integer
     if (finalTag && Number(finalTag) > 4294967295) {
       return setWithdrawError("Destination Tag is too large (Max: 4294967295).");
     }
@@ -249,41 +235,35 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
             txHash: tx.transaction_hash, 
             destXrplAddress: destClean, 
             amount: amountClean,
-            destinationTag: finalTag || null // Send the tag to the relayer
+            destinationTag: finalTag || null
         }),
       });
 
       if (!response.ok) throw new Error("Relayer failed");
-      alert(`Success! XRP is on its way to ${destClean}`);
+
+      // TRIGGER THE NEW GLOW AND SUMMARY INSTEAD OF ALERT
+      triggerGlow("withdraw", {
+          amount: amountClean,
+          address: destClean.slice(0, 6) + "...",
+          price: offChainPrice
+      });
       handleReset();
     } catch (e: any) {
       setWithdrawError(e.message || "Withdrawal failed.");
     } finally {
       setIsWithdrawing(false);
     }
-  }, [withdrawAmount, destXrplAddress, memoChars, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset]);
+  }, [withdrawAmount, destXrplAddress, memoChars, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset, triggerGlow, offChainPrice]);
 
   return (
     <div className="space-y-4 relative z-50">
-      
       <div className="form-control">
         <label className="label py-1">
           <span className="label-text text-xs font-semibold">Dest. XRPL Address</span>
         </label>
-        <input
-          ref={addrRef}
-          type="text"
-          inputMode="text"
-          autoComplete="off"
-          placeholder="r..."
-          className={`input input-sm input-bordered w-full ${withdrawError ? "input-error" : ""}`}
-          value={destXrplAddress}
-          onChange={(e) => setDestXrplAddress(e.target.value)}
-          style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
-        />
+        <input ref={addrRef} type="text" inputMode="text" autoComplete="off" placeholder="r..." className={`input input-sm input-bordered w-full ${withdrawError ? "input-error" : ""}`} value={destXrplAddress} onChange={(e) => setDestXrplAddress(e.target.value)} style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }} />
       </div>
 
-      {/* WHEEL OF FORTUNE TAG */}
       <div className="form-control">
         <label className="label py-1 flex justify-between">
           <span className="label-text text-xs font-semibold">Destination Tag (Optional)</span>
@@ -291,22 +271,7 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
         </label>
         <div className="flex justify-between gap-1 w-full" onPaste={handleMemoPaste}>
           {memoChars.map((char, index) => (
-            <input
-              key={`memo-slot-${index}`}
-              ref={(el) => {
-                if (el) memoRefs.current[index] = el;
-              }}
-              type="text"
-              inputMode="numeric" // 🚨 Forces number pad on mobile
-              pattern="[0-9]*"
-              maxLength={1}
-              autoComplete="off"
-              className="w-[9%] aspect-[2/3] text-center text-lg font-bold border border-base-content/20 bg-base-100 rounded shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] focus:border-primary focus:ring-1 focus:ring-primary transition-all p-0"
-              value={char}
-              onChange={(e) => handleMemoChange(index, e.target.value)}
-              onKeyDown={(e) => handleMemoKeyDown(index, e)}
-              style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
-            />
+            <input key={`memo-slot-${index}`} ref={(el) => { if (el) memoRefs.current[index] = el; }} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={1} autoComplete="off" className="w-[9%] aspect-[2/3] text-center text-lg font-bold border border-base-content/20 bg-base-100 rounded shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] focus:border-primary focus:ring-1 focus:ring-primary transition-all p-0" value={char} onChange={(e) => handleMemoChange(index, e.target.value)} onKeyDown={(e) => handleMemoKeyDown(index, e)} style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }} />
           ))}
         </div>
       </div>
@@ -315,40 +280,19 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS }: any) => {
         <label className="label py-1">
           <span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span>
         </label>
-        <input
-          ref={amountRef}
-          type="number"
-          step="0.01"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder="0.00"
-          className="input input-sm input-bordered w-full"
-          value={withdrawAmount}
-          onChange={(e) => setWithdrawAmount(e.target.value)}
-          style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }}
-        />
+        <input ref={amountRef} type="number" step="0.01" inputMode="decimal" autoComplete="off" placeholder="0.00" className="input input-sm input-bordered w-full" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }} />
       </div>
 
       {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
 
       {!isConnected ? (
-        <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>
-          Connect Wallet to Burn
-        </button>
+        <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>Connect Wallet to Burn</button>
       ) : (
         <div className="flex gap-2 mt-2">
-          <button
-            className={`btn btn-error btn-sm flex-1 !text-white font-bold ${isWithdrawing ? "loading" : ""}`}
-            onClick={handleWithdraw}
-            disabled={isWithdrawing}
-          >
+          <button className={`btn btn-error btn-sm flex-1 !text-white font-bold ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={isWithdrawing}>
             {isWithdrawing ? "Burning..." : "Confirm Burn"}
           </button>
-          <button
-            className="btn btn-outline border-base-content/20 text-base-content/70 hover:bg-base-content/10 btn-sm btn-square"
-            onClick={handleReset}
-            disabled={isWithdrawing}
-          >
+          <button className="btn btn-outline border-base-content/20 text-base-content/70 hover:bg-base-content/10 btn-sm btn-square" onClick={handleReset} disabled={isWithdrawing}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -370,6 +314,10 @@ export default function Explorer() {
   const [bridgeMode, setBridgeMode] = useState<"DEPOSIT" | "WITHDRAW">("DEPOSIT");
   const [hxtTab, setHxtTab] = useState<"GOVERN">("GOVERN");
   const [copiedText, setCopiedText] = useState("");
+
+  // --- GLOW & SUMMARY STATE ---
+  const [glowEffect, setGlowEffect] = useState<"withdraw" | "deposit" | null>(null);
+  const [txSummary, setTxSummary] = useState<{amount: string, address: string, price: string} | null>(null);
 
   // --- INTENT-BASED BRIDGING STATE ---
   const [selectedRisk, setSelectedRisk] = useState<number | null>(null);
@@ -421,6 +369,15 @@ export default function Explorer() {
     return () => clearInterval(interval);
   }, []);
 
+  const triggerGlow = useCallback((type: "withdraw" | "deposit", details: any) => {
+    setTxSummary(details);
+    setGlowEffect(type);
+    setTimeout(() => {
+      setGlowEffect(null);
+      setTxSummary(null);
+    }, 5000);
+  }, []);
+
   const handleCopy = (text: string, type: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(type);
@@ -432,7 +389,6 @@ export default function Explorer() {
       alert("Please connect your Starknet wallet first.");
       return;
     }
-    
     setIsRegisteringTag(true);
     const generatedTag = Math.floor(100000000 + Math.random() * 900000000);
 
@@ -453,9 +409,10 @@ export default function Explorer() {
       
       setDestTag(generatedTag);
       setTagRegistered(true);
+      // Optional: Small subtle glow when the tag is registered to confirm link
+      triggerGlow("deposit", { amount: "REGISTERED", address: "Vault Linked", price: marketData.offChainPrice });
     } catch (error) {
-      console.error("Error registering tag:", error);
-      alert("Failed to connect to relayer database. Please ensure your EC2 Node server is running.");
+      alert("Failed to connect to relayer database.");
     } finally {
       setIsRegisteringTag(false);
     }
@@ -494,6 +451,14 @@ export default function Explorer() {
 
               {bridgeMode === "DEPOSIT" ? (
                 <div className="space-y-4">
+                  <div className="flex justify-end">
+                    <button onClick={() => { setTagRegistered(false); setDestTag(null); }} className="btn btn-ghost btn-xs opacity-50 hover:opacity-100 flex gap-1 items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      New Route
+                    </button>
+                  </div>
                   {!tagRegistered ? (
                     <div className="bg-base-100 p-5 rounded-lg border border-secondary text-center shadow-[0_0_15px_rgba(var(--color-secondary),0.1)]">
                       <p className="text-sm font-bold mb-4">Step 1: Configure Route & Link Address</p>
@@ -584,6 +549,8 @@ export default function Explorer() {
                 <WithdrawalForm 
                   SXRP_DATA={SXRP_DATA} 
                   XRPL_VAULT_ADDRESS={XRPL_VAULT_ADDRESS} 
+                  triggerGlow={triggerGlow} 
+                  offChainPrice={marketData.offChainPrice}
                 />
               )}
             </div>
@@ -661,8 +628,23 @@ export default function Explorer() {
           </div>
         </div>
 
-        {/* --- sXRP CARD --- */}
-        <div className="card bg-base-100 shadow-xl border-t-4 border-secondary">
+        {/* --- sXRP CARD (DYNAMIC GLOW) --- */}
+        <div className={`card bg-base-100 shadow-xl border-t-4 transition-all duration-700 relative overflow-hidden
+          ${glowEffect === "withdraw" ? "border-error shadow-[0_0_25px_rgba(255,69,0,0.4)] scale-[1.01]" : 
+            glowEffect === "deposit" ? "border-success shadow-[0_0_25px_rgba(0,255,0,0.4)] scale-[1.01]" : 
+            "border-secondary"}`}>
+          
+          {/* Success Overlay Info */}
+          {txSummary && (
+            <div className="absolute top-10 left-0 w-full px-8 animate-fadeIn z-10">
+              <div className={`text-[10px] font-bold p-2 rounded bg-base-300 border flex justify-between shadow-sm
+                ${glowEffect === "withdraw" ? "border-error/40 text-error" : "border-success/40 text-success"}`}>
+                <span>{glowEffect === "withdraw" ? "BURNED" : "REGISTERED"}: {txSummary.amount} sXRP</span>
+                <span>@{txSummary.price}</span>
+              </div>
+            </div>
+          )}
+
           <div className="card-body">
             <div className="flex justify-between items-center mb-4">
               <h2 className="card-title opacity-70">sXRP Dashboard</h2>

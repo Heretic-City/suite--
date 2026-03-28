@@ -117,16 +117,38 @@ const LiveVestedAmount = () => {
   return <>{formatBalance(data)}</>;
 };
 
-
-// 🚨 THE NATIVE DOM OVERRIDE + NUMERIC DESTINATION TAG FIX 🚨
+// 🚨 THE NATIVE DOM OVERRIDE + NUMERIC DESTINATION TAG + MAX BALANCE + MINIMUM CHECK 🚨
 const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow, offChainPrice }: any) => {
-  const { account, isConnected } = useAccount();
+  const { account, isConnected, address } = useAccount();
   const { provider } = useProvider();
 
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [destXrplAddress, setDestXrplAddress] = useState("");
   const [withdrawError, setWithdrawError] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  // --- EXACT RAW BALANCE STATE ---
+  const [useMax, setUseMax] = useState(false);
+  const [rawMaxBalance, setRawMaxBalance] = useState<bigint>(0n);
+
+  const { data: balanceData } = useReadContract({
+    functionName: "balance_of",
+    abi: SXRP_DATA?.abi,
+    address: SXRP_DATA?.address,
+    args: address ? [address] : [],
+    watch: true,
+    enabled: !!address,
+  });
+
+  useEffect(() => {
+    if (!balanceData) return;
+    let rawBigInt = 0n;
+    if (typeof balanceData === 'bigint') rawBigInt = balanceData;
+    else if (typeof balanceData === 'object' && 'low' in balanceData) {
+      rawBigInt = BigInt(balanceData.low) + (BigInt(balanceData.high) << 128n);
+    }
+    setRawMaxBalance(rawBigInt);
+  }, [balanceData]);
 
   // --- THE NUMERIC TAG STATE ---
   const [memoChars, setMemoChars] = useState<string[]>(Array(10).fill(""));
@@ -200,7 +222,21 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
     setMemoChars(Array(10).fill(""));
     setWithdrawError("");
     setIsWithdrawing(false);
+    setUseMax(false);
   }, []);
+
+  const handleMaxClick = () => {
+    if (rawMaxBalance > 0n) {
+      const displayAmt = (Number(rawMaxBalance) / 1e18).toString();
+      setWithdrawAmount(displayAmt);
+      setUseMax(true);
+    }
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWithdrawAmount(e.target.value);
+    setUseMax(false);
+  };
 
   const handleWithdraw = useCallback(async () => {
     setWithdrawError("");
@@ -210,6 +246,12 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
 
     if (destClean === XRPL_VAULT_ADDRESS) return setWithdrawError("You cannot withdraw to the Bridge Vault.");
     if (!destClean || !amountClean || !SXRP_DATA?.address) return setWithdrawError("Please enter an amount and destination.");
+    
+    // 🚨 NEW: 0.35 Minimum Validation Check
+    const numericAmount = Number(amountClean);
+    if (isNaN(numericAmount) || numericAmount < 0.35) {
+      return setWithdrawError("Minimum withdrawal amount is 0.35 sXRP.");
+    }
     if (finalTag && Number(finalTag) > 4294967295) {
       return setWithdrawError("Destination Tag is too large (Max: 4294967295).");
     }
@@ -218,7 +260,14 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
 
     try {
       setIsWithdrawing(true);
-      const amountUint256 = cairo.uint256(BigInt(Math.floor(Number(amountClean) * 1e18)));
+      
+      let amountUint256;
+      if (useMax && rawMaxBalance > 0n) {
+        amountUint256 = cairo.uint256(rawMaxBalance);
+      } else {
+        amountUint256 = cairo.uint256(BigInt(Math.floor(Number(amountClean) * 1e18)));
+      }
+
       const finalCalls = [{ 
         contractAddress: SXRP_DATA.address, 
         entrypoint: "withdraw", 
@@ -241,7 +290,6 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
 
       if (!response.ok) throw new Error("Relayer failed");
 
-      // TRIGGER THE NEW GLOW AND SUMMARY INSTEAD OF ALERT
       triggerGlow("withdraw", {
           amount: amountClean,
           address: destClean.slice(0, 6) + "...",
@@ -253,7 +301,7 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
     } finally {
       setIsWithdrawing(false);
     }
-  }, [withdrawAmount, destXrplAddress, memoChars, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset, triggerGlow, offChainPrice]);
+  }, [withdrawAmount, destXrplAddress, memoChars, account, provider, SXRP_DATA, XRPL_VAULT_ADDRESS, handleReset, triggerGlow, offChainPrice, useMax, rawMaxBalance]);
 
   return (
     <div className="space-y-4 relative z-50">
@@ -277,20 +325,34 @@ const WithdrawalForm = React.memo(({ SXRP_DATA, XRPL_VAULT_ADDRESS, triggerGlow,
       </div>
 
       <div className="form-control">
-        <label className="label py-1">
-          <span className="label-text text-xs font-semibold">Burn Amount (sXRP)</span>
+        <label className="label py-1 flex justify-between items-center">
+          {/* 🚨 NEW: Added the (i) Information Tooltip here */}
+          <span className="label-text text-xs font-semibold flex items-center gap-1.5">
+            Withdraw Amount (sXRP)
+            <div className="tooltip tooltip-right cursor-help" data-tip="Minimum 0.35 sXRP required after fees">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="w-3.5 h-3.5 stroke-base-content/50 hover:stroke-primary transition-colors">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </span>
+          {isConnected && rawMaxBalance > 0n && (
+            <button onClick={handleMaxClick} className="text-[10px] font-bold text-secondary hover:text-primary transition-colors cursor-pointer border border-secondary/30 rounded px-1.5 py-0.5 bg-secondary/10">
+              MAX: {(Number(rawMaxBalance) / 1e18).toFixed(4)}
+            </button>
+          )}
         </label>
-        <input ref={amountRef} type="number" step="0.01" inputMode="decimal" autoComplete="off" placeholder="0.00" className="input input-sm input-bordered w-full" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }} />
+        <input ref={amountRef} type="number" step="0.01" inputMode="decimal" autoComplete="off" placeholder="0.00" className={`input input-sm input-bordered w-full ${useMax ? 'border-secondary text-secondary' : ''}`} value={withdrawAmount} onChange={handleAmountChange} style={{ userSelect: 'auto', pointerEvents: 'auto', touchAction: 'manipulation' }} />
       </div>
 
       {withdrawError && <p className="text-error text-[10px] font-semibold">{withdrawError}</p>}
 
+      {/* 🚨 CHANGED: Updated all button text from Burn to Withdraw */}
       {!isConnected ? (
-        <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>Connect Wallet to Burn</button>
+        <button className="btn btn-error btn-sm w-full mt-2 opacity-50 cursor-not-allowed !text-white" disabled>Connect Wallet to Withdraw</button>
       ) : (
         <div className="flex gap-2 mt-2">
-          <button className={`btn btn-error btn-sm flex-1 !text-white font-bold ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={isWithdrawing}>
-            {isWithdrawing ? "Burning..." : "Confirm Burn"}
+          <button className={`btn btn-error btn-sm flex-1 !text-white font-bold ${isWithdrawing ? "loading" : ""}`} onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount || !destXrplAddress}>
+            {isWithdrawing ? "Withdrawing..." : "Confirm Withdraw"}
           </button>
           <button className="btn btn-outline border-base-content/20 text-base-content/70 hover:bg-base-content/10 btn-sm btn-square" onClick={handleReset} disabled={isWithdrawing}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -446,7 +508,7 @@ export default function Explorer() {
             <div>
               <div className="flex justify-center gap-2 mb-4">
                 <button className={`btn btn-xs ${bridgeMode === "DEPOSIT" ? "btn-secondary text-white! font-bold" : "btn-ghost"}`} onClick={() => setBridgeMode("DEPOSIT")}>Deposit (XRPL → Starknet)</button>
-                <button className={`btn btn-xs ${bridgeMode === "WITHDRAW" ? "btn-error text-white! font-bold" : "btn-ghost"}`} onClick={() => setBridgeMode("WITHDRAW")}>Withdraw (Burn)</button>
+                <button className={`btn btn-xs ${bridgeMode === "WITHDRAW" ? "btn-error text-white! font-bold" : "btn-ghost"}`} onClick={() => setBridgeMode("WITHDRAW")}>Withdraw</button>
               </div>
 
               {bridgeMode === "DEPOSIT" ? (

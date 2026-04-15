@@ -1,3 +1,5 @@
+"use client";
+
 import { braavos, InjectedConnector, ready } from "@starknet-react/core";
 import { getTargetNetworks } from "~~/utils/scaffold-stark";
 import { BurnerConnector } from "@scaffold-stark/stark-burner";
@@ -5,11 +7,13 @@ import scaffoldConfig from "~~/scaffold.config";
 import { LAST_CONNECTED_TIME_LOCALSTORAGE_KEY } from "~~/utils/Constants";
 import { KeplrConnector } from "./keplr";
 
+// 🚨 THE FIX: Use the Named Export specifically for ControllerConnector
+import { ControllerConnector } from "@cartridge/connector";
+
 const targetNetworks = getTargetNetworks();
 
 export const connectors = getConnectors();
 
-// workaround helper function to properly disconnect with removing local storage (prevent autoconnect infinite loop)
 function withDisconnectWrapper(connector: InjectedConnector) {
   const connectorDisconnect = connector.disconnect;
   const _disconnect = (): Promise<void> => {
@@ -23,8 +27,25 @@ function withDisconnectWrapper(connector: InjectedConnector) {
 
 function getConnectors() {
   const { targetNetworks } = scaffoldConfig;
-
+  
+  // Start with the standard connectors
   const connectors: InjectedConnector[] = [ready(), braavos()];
+
+  // 🚨 SSR SHIELD: Cartridge tries to read the browser window, so we only instantiate it on the client
+  if (typeof window !== "undefined") {
+    try {
+      const cartridge = new ControllerConnector({
+        rpc: targetNetworks[0].rpcUrls.public.http[0],
+        policies: [],
+      }) as unknown as InjectedConnector;
+      
+      // Inject Cartridge right into the front of the list!
+      connectors.unshift(cartridge);
+    } catch (e) {
+      console.error("Cartridge failed to initialize:", e);
+    }
+  }
+
   const isDevnet = targetNetworks.some(
     (network) => (network.network as string) === "devnet",
   );
@@ -33,7 +54,6 @@ function getConnectors() {
     connectors.push(new KeplrConnector());
   } else {
     const burnerConnector = new BurnerConnector();
-    // burnerConnector's should be initialized with dynamic network instead of hardcoded devnet to support mainnetFork
     burnerConnector.chain = targetNetworks[0];
     connectors.push(burnerConnector as unknown as InjectedConnector);
   }

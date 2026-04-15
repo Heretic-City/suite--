@@ -30,6 +30,7 @@
     "verify": "yarn workspace @ss-2/snfoundry verify"
   },
   "dependencies": {
+    "@cartridge/connector": "^0.13.11",
     "framer-motion": "^12.38.0",
     "postcss": "^8.4.38"
   },

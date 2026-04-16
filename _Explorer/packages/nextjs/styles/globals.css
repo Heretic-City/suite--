@@ -52,14 +52,14 @@
   --rounded-btn: 9999rem;
 }
 /* The "X-Ray" Debugger */
-* {
+/* * {
   outline: 1px solid rgba(255, 0, 0, 0.1) !important;
 }
 
 *:hover {
   outline: 2px solid red !important;
   background: rgba(255, 0, 0, 0.05) !important;
-}
+} */
 /* Debugger */
 /* Shared Utilities */
 

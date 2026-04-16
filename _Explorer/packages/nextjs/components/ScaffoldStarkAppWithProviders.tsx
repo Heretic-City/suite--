@@ -52,7 +52,7 @@ const ScaffoldStarkApp = ({ children }: { children: React.ReactNode }) => {
         )}
         <Header />
         {/* 🚨 CRITICAL: Removed overflow hidden/clip to ensure page.tsx sticky works */}
-        <main className="relative flex flex-col flex-1">{children}</main>
+        <main className="relative min-h-screen">{children}</main>
         <Footer />
       </div>
       <Toaster />

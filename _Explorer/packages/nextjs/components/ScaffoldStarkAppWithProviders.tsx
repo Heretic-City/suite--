@@ -22,7 +22,6 @@ const ScaffoldStarkApp = ({ children }: { children: React.ReactNode }) => {
   const [isLockdown, setIsLockdown] = useState(false);
 
   useEffect(() => {
-    // Canary: Lockdown Mode disables WebAssembly
     try {
       const wasmSupported = typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function";
       if (!wasmSupported) setIsLockdown(true);
@@ -38,10 +37,10 @@ const ScaffoldStarkApp = ({ children }: { children: React.ReactNode }) => {
           ⚠️ Lockdown Mode Detected: Site functionality limited. Disable in iOS Settings to connect.
         </div>
       )}
+      {/* 🚨 CSS ADJUSTMENT: Ensure the container allows sticky behavior (no overflow-x hidden here) */}
       <div className={`flex relative flex-col min-h-screen bg-main ${isLockdown ? "pt-10" : ""}`}>
         {isDarkMode ? (
           <>
-            {/* 🚨 THE FIX: added pointer-events-none to prevent invisible click blocking */}
             <div className="circle-gradient-dark w-[330px] h-[330px] pointer-events-none"></div>
             <div className="circle-gradient-blue-dark w-[330px] h-[330px] pointer-events-none"></div>
           </>
@@ -52,6 +51,7 @@ const ScaffoldStarkApp = ({ children }: { children: React.ReactNode }) => {
           </>
         )}
         <Header />
+        {/* 🚨 CRITICAL: Removed overflow hidden/clip to ensure page.tsx sticky works */}
         <main className="relative flex flex-col flex-1">{children}</main>
         <Footer />
       </div>

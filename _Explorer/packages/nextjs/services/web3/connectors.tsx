@@ -32,14 +32,14 @@ function getConnectors() {
   const connectors: InjectedConnector[] = [ready(), braavos()];
 
   // 🚨 SSR SHIELD: Cartridge tries to read the browser window, so we only instantiate it on the client
-  if (typeof window !== "undefined") {
+if (typeof window !== "undefined") {
     try {
       const cartridge = new ControllerConnector({
-        rpc: targetNetworks[0].rpcUrls.public.http[0],
+        // 🚨 OVERRIDE: We are bypassing targetNetworks entirely so it never touches Alchemy again
+        rpc: "https://api.cartridge.gg/x/starknet/mainnet",
         policies: [],
       }) as unknown as InjectedConnector;
       
-      // Inject Cartridge right into the front of the list!
       connectors.unshift(cartridge);
     } catch (e) {
       console.error("Cartridge failed to initialize:", e);

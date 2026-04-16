@@ -1,162 +1,132 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import Head from "next/head";
+import { useRef, useEffect, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import Link from "next/link";
+
+const Sprite = ({ name, className }: { name: string; className?: string }) => {
+  const spriteMap: Record<string, React.CSSProperties> = {
+    vault: { backgroundPosition: "10% 12%", backgroundSize: "250%", width: "220px", height: "220px" },
+    xrp: { backgroundPosition: "85% 4%", backgroundSize: "400%", width: "100px", height: "100px", borderRadius: "50%" },
+    sxrp: { backgroundPosition: "66% 36%", backgroundSize: "450%", width: "110px", height: "110px", borderRadius: "50%" },
+    hxt: { backgroundPosition: "100% 36%", backgroundSize: "450%", width: "110px", height: "110px", borderRadius: "50%" },
+    lattice: { backgroundPosition: "100% 100%", backgroundSize: "200%", width: "100%", height: "100%" },
+    greenPulse: { backgroundPosition: "18% 85%", backgroundSize: "380%", width: "140px", height: "100px" },
+    orangeFuel: { backgroundPosition: "52% 85%", backgroundSize: "380%", width: "140px", height: "80px" },
+  };
+  return (
+    <div 
+      className={`bg-[url('/sprite-sheet.png')] bg-no-repeat ${className || ""}`} 
+      style={{ ...spriteMap[name], transform: "translateZ(0)", backfaceVisibility: "hidden" }} 
+    />
+  );
+};
 
 export default function Home() {
-  const [sections, setSections] = useState<any[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Fetch the JSON data
+  // 🚨 DEVICE DETECTION
   useEffect(() => {
-    fetch('/blackpaper.json')
-      .then(res => res.json())
-      .then(data => setSections(data.sections))
-      .catch(err => console.error("JSON Load Error:", err));
+    const checkDevice = () => setIsMobile(window.innerWidth < 768);
+    checkDevice();
+    window.addEventListener("resize", checkDevice);
+    return () => window.removeEventListener("resize", checkDevice);
   }, []);
 
-  // Intersection Observer for the scroll animation
-  useEffect(() => {
-    if (!containerRef.current || sections.length === 0) return;
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
 
-    const lines = containerRef.current.querySelectorAll(".scroll-line");
-    
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("reveal");
-        }
-      });
-    }, { threshold: 0.2 });
+  // 🚨 CLEAN TEXT TIMELINES (No Overlap)
+  const text1Opacity = useTransform(scrollYProgress, [0, 0.08, 0.12], [1, 1, 0]);
+  const text2Opacity = useTransform(scrollYProgress, [0.12, 0.18, 0.32, 0.38], [0, 1, 1, 0]);
+  const text3Opacity = useTransform(scrollYProgress, [0.38, 0.45, 0.55, 0.62], [0, 1, 1, 0]);
+  const text4Opacity = useTransform(scrollYProgress, [0.62, 0.7, 0.82, 0.88], [0, 1, 1, 0]);
+  const text5Opacity = useTransform(scrollYProgress, [0.88, 0.95, 1], [0, 1, 1]);
 
-    lines.forEach(line => observer.observe(line));
-
-    return () => observer.disconnect();
-  }, [sections]);
-
-  // Helper to safely render inline code formatting
-  const renderText = (text: string) => {
-    return text.split("\n\n").map((paragraph, index) => {
-      // Split the paragraph by backticks to find inline code
-      const parts = paragraph.split(/`([^`]+)`/g);
-      return (
-        <p key={index} className="mb-4 leading-relaxed">
-          {parts.map((part, i) => 
-            // Odd indices match the content inside the backticks
-            i % 2 === 1 ? (
-              <span key={i} className="bg-[#00FFC0]/10 text-[#00FFC0] px-1.5 py-0.5 rounded font-mono text-[0.95rem]">
-                {part}
-              </span>
-            ) : (
-              <span key={i}>{part}</span>
-            )
-          )}
-        </p>
-      );
-    });
-  };
+  // Asset Animations
+  const vaultOpacity = useTransform(scrollYProgress, [0.05, 0.15], [0, 1]);
+  const xrpY = useTransform(scrollYProgress, [0.15, 0.35], [0, 150]); 
+  const xrpScale = useTransform(scrollYProgress, [0.05, 0.1, 0.25, 0.27], [0.5, 1, 1, 0]);
+  const sxrpOpacity = useTransform(scrollYProgress, [0.35, 0.4, 0.55, 0.6], [0, 1, 1, 0]);
+  const sxrpX = useTransform(scrollYProgress, [0.4, 0.6], [0, -310]); 
+  const hxtOpacity = useTransform(scrollYProgress, [0.45, 0.5, 0.6, 0.65], [0, 1, 1, 0]);
+  const hxtX = useTransform(scrollYProgress, [0.5, 0.65], [310, 0]); 
 
   return (
-    <>
-      <Head>
-        <title>HXT — The Black Paper</title>
-      </Head>
-
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,#2a2a2a_0%,#0b0b0b_55%,#000_100%)] font-serif text-[#f4f1ea] py-16 px-5 relative">
+    <div ref={containerRef} className="relative h-[450vh] bg-[#0a0f16]">
+      
+      {/* 🚨 THE GLIDE STAGE */}
+      <div className="fixed top-0 left-0 w-full h-full flex flex-col items-center justify-center overflow-hidden pointer-events-none z-10">
         
-        {/* The Black Paper Container */}
-        <div className="relative max-w-5xl mx-auto p-8 md:p-16 bg-[linear-gradient(145deg,#111,#0a0a0a)] rounded-xl border border-[#00FFC0]/10 shadow-[0_0_60px_rgba(0,255,192,0.05),0_0_120px_rgba(0,0,0,0.9)] overflow-hidden group">
-          
-          {/* Scanline Animation */}
-          <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(to_bottom,rgba(0,255,192,0.03)_0px,rgba(0,255,192,0.03)_1px,transparent_2px,transparent_4px)] animate-[scanMove_8s_linear_infinite]" />
+        {/* Background - Lattice stays light for both */}
+        <motion.div style={{ opacity: 0.4 }} className="absolute inset-0 z-0 flex items-center justify-center">
+          <Sprite name="lattice" />
+        </motion.div>
 
-          {/* Dynamic Content */}
-          <div ref={containerRef} className="relative z-10">
-            {sections.map((section, idx) => (
-              <div key={idx} className="mb-24 scroll-line opacity-0 translate-y-10 blur-sm transition-all duration-1200 ease-out">
-                
-                {section.title && (
-                  <h2 className="text-2xl md:text-3xl font-bold mb-5 text-[#ff8c3c]">
-                    {section.title}
-                  </h2>
-                )}
-
-                {section.content && renderText(section.content)}
-
-                {/* Modules (Code Blocks and Routing Grids) */}
-                {section.modules?.map((module: any, modIdx: number) => (
-                  <div key={modIdx} className="bg-white/5 border border-[#00FFC0]/10 p-6 rounded-lg my-8 transition-all duration-300 hover:border-[#00FFC0]/35 hover:shadow-[0_0_30px_rgba(0,255,192,0.08)]">
-                    
-                    <h3 className="text-xl font-bold mb-3 text-[#00FFC0]">{module.title}</h3>
-
-                    {module.type === "code-block" && (
-                      <pre className="bg-[#0d1117] p-5 rounded-lg overflow-x-auto border border-[#00FFC0]/15 mt-4">
-                        <code className="text-[#00FFC0] font-mono text-[0.95rem]">{module.code}</code>
-                      </pre>
-                    )}
-
-                    {module.type === "routing-grid" && (
-                      <>
-                        {module.intro && renderText(module.intro)}
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
-                          {module.table.map((row: any, rowIdx: number) => (
-                            <div key={rowIdx} className="bg-[#00FFC0]/5 p-5 rounded-lg border border-[#00FFC0]/20">
-                              <h3 className="text-lg font-bold text-[#00FFC0] mb-2">{row.method}</h3>
-                              <p className="mb-2"><strong>Field:</strong> {row.field}</p>
-                              <p className="mb-2"><strong>Logic:</strong> {row.logic}</p>
-                              <p><strong>User:</strong> {row.user}</p>
-                            </div>
-                          ))}
-                        </div>
-
-                        {module.conclusion && <div className="mt-6">{renderText(module.conclusion)}</div>}
-                      </>
-                    )}
-                  </div>
-                ))}
-
-                {/* Tokenomics Block */}
-                {section.tokenomics && (
-                  <div className="mt-8">
-                    <p className="mb-6 font-bold text-lg">Total Supply: <span className="text-[#00FFC0]">{section.tokenomics.total_supply}</span></p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                      {section.tokenomics.distribution.map((item: any, itemIdx: number) => (
-                        <div key={itemIdx} className="bg-[#00FFC0]/5 p-5 rounded-lg border border-[#00FFC0]/20 text-center">
-                          <h3 className="text-3xl font-bold text-[#ff8c3c] mb-2">{item.percent}%</h3>
-                          <p className="font-semibold">{item.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {section.tokenomics.additional_notes && (
-                      <div className="mt-8">{renderText(section.tokenomics.additional_notes)}</div>
-                    )}
-                  </div>
-                )}
-
-                {section.conclusion && renderText(section.conclusion)}
-
-              </div>
-            ))}
-          </div>
+        {/* Text Layer - Adjusted for mobile scale */}
+        <div className="absolute top-28 md:top-32 z-50 text-center px-5 w-full">
+          <motion.div style={{ opacity: text1Opacity }} className="absolute inset-0 flex flex-col items-center">
+            <h1 className="text-2xl md:text-5xl font-bold text-primary">"Bridging the Unbridgeable."</h1>
+          </motion.div>
+          <motion.div style={{ opacity: text2Opacity }} className="absolute inset-0 flex flex-col items-center">
+            <h1 className="text-2xl md:text-5xl font-bold text-neutral-content">Securing the Asset</h1>
+          </motion.div>
+          <motion.div style={{ opacity: text3Opacity }} className="absolute inset-0 flex flex-col items-center">
+            <h1 className="text-2xl md:text-5xl font-bold text-success">Minting sXRP</h1>
+          </motion.div>
+          <motion.div style={{ opacity: text4Opacity }} className="absolute inset-0 flex flex-col items-center">
+            <h1 className="text-2xl md:text-5xl font-bold text-warning">Injecting HXT</h1>
+          </motion.div>
+          <motion.div style={{ opacity: text5Opacity }} className="absolute inset-0 flex flex-col items-center">
+            <h1 className="text-2xl md:text-5xl font-bold text-primary">Bridge Complete</h1>
+          </motion.div>
         </div>
-      </main>
 
-      {/* Tailwind Custom Animations */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes scanMove {
-          from { transform: translateY(0); }
-          to   { transform: translateY(40px); }
-        }
-        .reveal {
-          opacity: 1 !important;
-          transform: translateY(0) !important;
-          filter: blur(0) !important;
-          text-shadow: 0 0 6px rgba(255,140,60,0.4), 0 0 18px rgba(255,60,20,0.3);
-        }
-      `}} />
-    </>
+        {/* 🚨 ASSET STAGE */}
+        <div className="relative w-full max-w-4xl h-[400px] z-20 flex items-center justify-center">
+          
+          <motion.div style={{ opacity: vaultOpacity }} className="absolute z-20 top-[100px]">
+            {/* Desktop Glide: High quality | Mobile Glide: Clean and Fast */}
+            <Sprite name="vault" className={!isMobile ? "drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]" : ""} />
+          </motion.div>
+
+          <motion.div style={{ scale: xrpScale, y: xrpY, x: -18 }} className="absolute z-30 top-0 left-1/2 -translate-x-1/2">
+            <Sprite name="xrp" />
+          </motion.div>
+
+          <motion.div style={{ opacity: sxrpOpacity, x: sxrpX }} className="absolute z-30 top-[200px]">
+            <Sprite name="sxrp" className={!isMobile ? "shadow-[0_0_20px_rgba(74,222,128,0.4)]" : ""} />
+          </motion.div>
+
+          <motion.div style={{ opacity: hxtOpacity, x: hxtX }} className="absolute z-30 top-[180px]">
+            <Sprite name="hxt" className={!isMobile ? "shadow-[0_0_20px_rgba(251,146,60,0.4)]" : ""} />
+          </motion.div>
+
+          {/* 🚨 DESKTOP ONLY GLOWS: Hidden on mobile glide to prevent memory crash */}
+          {!isMobile && (
+            <>
+              <motion.div style={{ opacity: sxrpOpacity }} className="absolute z-10 top-[210px] left-[150px] blur-xl scale-150">
+                <Sprite name="greenPulse" />
+              </motion.div>
+              <motion.div style={{ opacity: hxtOpacity }} className="absolute z-10 top-[210px] right-[150px] blur-xl scale-150">
+                <Sprite name="orangeFuel" />
+              </motion.div>
+            </>
+          )}
+        </div>
+
+        <motion.div style={{ opacity: text5Opacity }} className="absolute bottom-20 z-50 pointer-events-auto">
+          <Link href="/explorer">
+            <button className="btn btn-primary btn-lg px-12 shadow-2xl hover:scale-105 transition-all">
+              Enter Heretic City
+            </button>
+          </Link>
+        </motion.div>
+
+      </div>
+    </div>
   );
 }

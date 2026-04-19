@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 
+// 🚨 SPRITE COMPONENT: Optimized for "will-change" to prevent stacking
 const Sprite = ({ name, className }: { name: string; className?: string }) => {
   const spriteMap: Record<string, React.CSSProperties> = {
     vault: { backgroundPosition: "10% 12%", backgroundSize: "250%", width: "220px", height: "220px" },
@@ -14,7 +15,12 @@ const Sprite = ({ name, className }: { name: string; className?: string }) => {
     greenPulse: { backgroundPosition: "18% 85%", backgroundSize: "380%", width: "140px", height: "100px" },
     orangeFuel: { backgroundPosition: "52% 85%", backgroundSize: "380%", width: "140px", height: "80px" },
   };
-  return <div className={`bg-[url('/sprite-sheet.png')] bg-no-repeat ${className || ""}`} style={spriteMap[name]} />;
+  return (
+    <div 
+      className={`bg-[url('/sprite-sheet.png')] bg-no-repeat will-change-transform ${className || ""}`} 
+      style={{ ...spriteMap[name] }} 
+    />
+  );
 };
 
 export default function Home() {
@@ -24,63 +30,74 @@ export default function Home() {
     offset: ["start start", "end end"],
   });
 
-  // --- ANIMATION TIMELINES (Same as original) ---
-  const text1Opacity = useTransform(scrollYProgress, [0, 0.1, 0.15], [1, 1, 0]);
-  const text2Opacity = useTransform(scrollYProgress, [0.15, 0.2, 0.35, 0.4], [0, 1, 1, 0]);
-  const text3Opacity = useTransform(scrollYProgress, [0.4, 0.45, 0.55, 0.6], [0, 1, 1, 0]);
-  const text4Opacity = useTransform(scrollYProgress, [0.6, 0.65, 0.75, 0.8], [0, 1, 1, 0]);
-  const text5Opacity = useTransform(scrollYProgress, [0.8, 0.85, 1], [0, 1, 1]);
-  const vaultOpacity = useTransform(scrollYProgress, [0.05, 0.15], [0, 1]);
+  // 🚨 TEXT RELAY: Precision timing to prevent overlap
+  const text1Op = useTransform(scrollYProgress, [0, 0.08, 0.1], [1, 1, 0]);
+  const text2Op = useTransform(scrollYProgress, [0.1, 0.15, 0.3, 0.35], [0, 1, 1, 0]);
+  const text3Op = useTransform(scrollYProgress, [0.35, 0.4, 0.55, 0.6], [0, 1, 1, 0]);
+  const text4Op = useTransform(scrollYProgress, [0.6, 0.65, 0.8, 0.85], [0, 1, 1, 0]);
+  const text5Op = useTransform(scrollYProgress, [0.85, 0.9, 1], [0, 1, 1]);
+
+  // Asset Timelines
+  const vaultOp = useTransform(scrollYProgress, [0.05, 0.15], [0, 1]);
   const xrpY = useTransform(scrollYProgress, [0.15, 0.35], [0, 150]); 
   const xrpScale = useTransform(scrollYProgress, [0.05, 0.1, 0.25, 0.27], [0.5, 1, 1, 0]);
-  const xrpInsideOpacity = useTransform(scrollYProgress, [0.25, 0.27], [1, 0]);
-  const walletOpacity = useTransform(scrollYProgress, [0.3, 0.35], [0, 1]);
-  const sxrpOpacity = useTransform(scrollYProgress, [0.35, 0.4, 0.55, 0.6], [0, 1, 1, 0]);
-  const sxrpX = useTransform(scrollYProgress, [0.4, 0.6], [0, -310]); 
-  const sxrpScale = useTransform(scrollYProgress, [0.55, 0.6], [1, 0.5]); 
-  const greenPulseOpacity = useTransform(scrollYProgress, [0.4, 0.42], [0, 1]);
-  const greenPulseClip = useTransform(scrollYProgress, [0.4, 0.48], ["inset(0 100% 0 0)", "inset(0 0% 0 0)"]);
-  const hxtOpacity = useTransform(scrollYProgress, [0.45, 0.5, 0.6, 0.65], [0, 1, 1, 0]);
-  const hxtX = useTransform(scrollYProgress, [0.5, 0.65], [310, 0]); 
-  const hxtScale = useTransform(scrollYProgress, [0.6, 0.65], [1, 0.5]); 
-  const orangeFuelOpacity = useTransform(scrollYProgress, [0.55, 0.57], [0, 1]);
-  const orangeFuelClip = useTransform(scrollYProgress, [0.55, 0.62], ["inset(0 0% 0 100%)", "inset(0 0% 0 0)"]);
-  const bgOpacity = useTransform(scrollYProgress, [0.3, 0.5], [0, 1]);
+  const sxrpX = useTransform(scrollYProgress, [0.4, 0.6], [0, -280]); // Slightly smaller for mobile safety
+  const hxtX = useTransform(scrollYProgress, [0.5, 0.7], [280, 0]); 
 
   return (
-    <div ref={containerRef} className="relative h-[500vh] bg-[#0a0f16]">
-      
-      {/* 🚨 FIXED STAGE: This is now independent of the scroll context. */}
-      {/* It will stay on screen regardless of parent overflow settings. */}
-      <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden pointer-events-none">
+    <div ref={containerRef} className="relative h-[450vh] bg-[#0a0f16]">
+      <div className="fixed top-0 left-0 w-full h-full flex flex-col items-center justify-center overflow-hidden pointer-events-none z-10">
         
-        <motion.div style={{ opacity: bgOpacity }} className="absolute inset-0 z-0 flex items-center justify-center opacity-40">
+        {/* Lattice */}
+        <div className="absolute inset-0 z-0 flex items-center justify-center opacity-30">
           <Sprite name="lattice" />
-        </motion.div>
-
-        <div className="absolute top-24 z-50 text-center px-5 w-full flex justify-center">
-          <motion.div style={{ opacity: text1Opacity }} className="absolute"><h1 className="text-3xl font-bold text-primary">"Bridging the Unbridgeable."</h1></motion.div>
-          <motion.div style={{ opacity: text2Opacity }} className="absolute"><h1 className="text-3xl font-bold text-neutral-content">Securing the Asset</h1></motion.div>
-          <motion.div style={{ opacity: text3Opacity }} className="absolute"><h1 className="text-3xl font-bold text-success">Minting sXRP</h1></motion.div>
-          <motion.div style={{ opacity: text4Opacity }} className="absolute"><h1 className="text-3xl font-bold text-warning">Injecting HXT</h1></motion.div>
-          <motion.div style={{ opacity: text5Opacity }} className="absolute"><h1 className="text-3xl font-bold text-primary">Bridge Complete</h1></motion.div>
         </div>
 
-        <div className="relative w-full max-w-4xl h-[400px] z-10 flex items-center justify-center mt-10">
-          <motion.div style={{ opacity: walletOpacity }} className="absolute z-20 w-20 h-20 bg-base-300/50 rounded-2xl border border-success/30 flex items-center justify-center left-[10%]">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+        {/* Story Text */}
+        <div className="absolute top-24 md:top-32 z-50 text-center w-full">
+          <motion.h1 style={{ opacity: text1Op }} className="absolute inset-x-0 text-2xl md:text-5xl font-bold text-primary">"Bridging the Unbridgeable."</motion.h1>
+          <motion.h1 style={{ opacity: text2Op }} className="absolute inset-x-0 text-2xl md:text-5xl font-bold text-neutral-content">Securing the Asset</motion.h1>
+          <motion.h1 style={{ opacity: text3Op }} className="absolute inset-x-0 text-2xl md:text-5xl font-bold text-success">Minting sXRP</motion.h1>
+          <motion.h1 style={{ opacity: text4Op }} className="absolute inset-x-0 text-2xl md:text-5xl font-bold text-warning">Injecting HXT</motion.h1>
+          <motion.h1 style={{ opacity: text5Op }} className="absolute inset-x-0 text-2xl md:text-5xl font-bold text-primary">Bridge Complete</motion.h1>
+        </div>
+
+        {/* 🚨 THE STAGE: Consistent for both Mobile/Desktop */}
+        <div className="relative w-full max-w-4xl h-[400px] z-20 flex items-center justify-center">
+          
+          <motion.div style={{ opacity: vaultOp }} className="absolute z-20 top-[100px]">
+             {/* Uses CSS 'hidden md:block' to handle shadows without ghosting */}
+            <Sprite name="vault" className="drop-shadow-xl md:drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]" />
           </motion.div>
-          <motion.div style={{ opacity: vaultOpacity }} className="absolute z-20 top-[120px]"><Sprite name="vault" /></motion.div>
-          <motion.div style={{ opacity: xrpInsideOpacity, scale: xrpScale, y: xrpY, x: -18 }} className="absolute z-30 top-[10px] left-1/2 -translate-x-1/2"><Sprite name="xrp" /></motion.div>
-          <motion.div style={{ opacity: sxrpOpacity, x: sxrpX, scale: sxrpScale }} className="absolute z-30 top-[220px]"><Sprite name="sxrp" /></motion.div>
-          <motion.div style={{ opacity: hxtOpacity, x: hxtX, scale: hxtScale }} className="absolute z-30 top-[200px]"><Sprite name="hxt" /></motion.div>
-          <motion.div style={{ opacity: greenPulseOpacity, clipPath: greenPulseClip }} className="absolute z-10 top-[230px] left-[150px]"><Sprite name="greenPulse" /></motion.div>
-          <motion.div style={{ opacity: orangeFuelOpacity, clipPath: orangeFuelClip }} className="absolute z-10 top-[230px] right-[150px]"><Sprite name="orangeFuel" /></motion.div>
+
+          <motion.div style={{ scale: xrpScale, y: xrpY, x: -18 }} className="absolute z-30 top-0 left-1/2 -translate-x-1/2">
+            <Sprite name="xrp" />
+          </motion.div>
+
+          <motion.div style={{ opacity: vaultOp, x: sxrpX }} className="absolute z-30 top-[200px]">
+            <Sprite name="sxrp" className="shadow-lg md:shadow-[0_0_20px_rgba(74,222,128,0.4)]" />
+          </motion.div>
+
+          <motion.div style={{ opacity: vaultOp, x: hxtX }} className="absolute z-30 top-[180px]">
+            <Sprite name="hxt" className="shadow-lg md:shadow-[0_0_20px_rgba(251,146,60,0.4)]" />
+          </motion.div>
+
+          {/* 🚨 DESKTOP ONLY: Pure CSS hidden on mobile to avoid GPU crash */}
+          <div className="hidden md:block">
+            <motion.div style={{ opacity: vaultOp }} className="absolute z-10 top-[210px] left-[150px] blur-xl scale-150">
+              <Sprite name="greenPulse" />
+            </motion.div>
+            <motion.div style={{ opacity: vaultOp }} className="absolute z-10 top-[210px] right-[150px] blur-xl scale-150">
+              <Sprite name="orangeFuel" />
+            </motion.div>
+          </div>
         </div>
 
-        <motion.div style={{ opacity: text5Opacity }} className="absolute bottom-20 z-50 pointer-events-auto">
+        <motion.div style={{ opacity: text5Op }} className="absolute bottom-20 z-50 pointer-events-auto">
           <Link href="/explorer">
-            <button className="btn btn-primary btn-lg shadow-xl">Enter Heretic City</button>
+            <button className="btn btn-primary btn-lg px-12 shadow-2xl transition-transform hover:scale-105 active:scale-95">
+              Enter Heretic City
+            </button>
           </Link>
         </motion.div>
       </div>

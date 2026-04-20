@@ -62,35 +62,12 @@ const ScaffoldStarkApp = ({ children }: { children: React.ReactNode }) => {
 
 export const ScaffoldStarkAppWithProviders = ({ children }: { children: React.ReactNode }) => {
   const [mounted, setMounted] = useState(false);
-  const [isLockdown, setIsLockdown] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // 🚨 THE PRE-EMPTIVE STRIKE: Check for WASM before the providers boot
-    try {
-      const wasmSupported = typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function";
-      if (!wasmSupported) {
-        setIsLockdown(true);
-      }
-    } catch (e) {
-      setIsLockdown(true);
-    }
   }, []);
 
   if (!mounted) return null;
-
-  // 🚨 IF LOCKDOWN: Render a clean, non-Starknet page to avoid the "Application Error"
-  if (isLockdown) {
-    return (
-      <div className="min-h-screen bg-[#0a0f16] flex items-center justify-center p-10 text-center">
-        <div className="max-w-md bg-red-900/20 border border-red-500/50 p-8 rounded-2xl shadow-2xl">
-          <h1 className="text-3xl font-bold text-red-500 mb-4">Lockdown Mode Active</h1>
-          <p className="text-gray-300 mb-6">Heretic City requires WebAssembly and secure cryptography to bridge assets. These features are disabled in iOS Lockdown Mode.</p>
-          <p className="text-sm text-gray-500">Go to Settings &gt; Privacy &amp; Security &gt; Lockdown Mode to disable it for this site.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <StarknetConfig
